@@ -8,8 +8,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"Proyecto_Aplicaciones_Web_II/internal/models"
-	"Proyecto_Aplicaciones_Web_II/internal/storage"
+	"Pesca_Directa_AplicacionesWeb_II/internal/models"
+	"Pesca_Directa_AplicacionesWeb_II/internal/storage"
 )
 
 // parseID extrae el parámetro {id} de la URL y lo convierte a int.
@@ -21,6 +21,19 @@ func parseID(r *http.Request) (int, bool) {
 		return 0, false
 	}
 	return id, true
+}
+
+func RespondJSON(w http.ResponseWriter, status int, data interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	if data == nil {
+		return
+	}
+	json.NewEncoder(w).Encode(data)
+}
+
+func RespondError(w http.ResponseWriter, status int, message string) {
+	RespondJSON(w, status, map[string]string{"error": message})
 }
 
 // MontarRutasPesca registra todas las rutas del módulo dentro del subrouter /api/v1.
