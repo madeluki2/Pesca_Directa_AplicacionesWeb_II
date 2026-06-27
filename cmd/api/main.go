@@ -4,71 +4,45 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/go-chi/chi/v5"
-	chimw "github.com/go-chi/chi/v5/middleware"
-
 	"Pesca_Directa_AplicacionesWeb_II/internal/handlers"
 	"Pesca_Directa_AplicacionesWeb_II/internal/storage"
+
+	"github.com/go-chi/chi/v5"
+	chimw "github.com/go-chi/chi/v5/middleware"
 )
 
 func main() {
 
-	// =========================
-	// Gestión de Pesca (SQLite)
-	// =========================
+	// ============================
+	// Almacenamiento en memoria
+	// ============================
+	storePesca := storage.NuevaMemoriaPesca()
 
-	db, err := storage.NuevaConexionSQLite()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	storePesca := storage.NuevaSQLitePesca(db)
-
-	// =========================
-	// Gestión de Pedidos
-	// =========================
-
-	almacenPedidos := storage.NewMemoria()
-	almacenPedidos.Seed()
-
-	servidorPedidos := handlers.NewServer(almacenPedidos)
-
-	// =========================
+	// ============================
 	// Router principal
-	// =========================
-
+	// ============================
 	r := chi.NewRouter()
 
+	// ============================
+	// Middlewares
+	// ============================
 	r.Use(chimw.Logger)
 	r.Use(chimw.Recoverer)
 
-	// =========================
-	// Rutas Pesca
-	// =========================
-
+	// ============================
+	// API Version 1
+	// ============================
 	r.Route("/api/v1", func(r chi.Router) {
+
+		// Gestión de Pesca
 		handlers.MontarRutasPesca(r, storePesca)
+
 	})
 
-	// =========================
-	// Rutas Pedidos
-	// =========================
-
-	r.Route("/api/v1/clientes", func(r chi.Router) {
-		r.Get("/", servidorPedidos.ListarClientes)
-		r.Post("/", servidorPedidos.CrearCliente)
-		// ...
-	})
-
-	r.Route("/api/v1/pedidos", func(r chi.Router) {
-		r.Get("/", servidorPedidos.ListarPedidos)
-		// ...
-	})
-
-	// =========================
-	// Servidor
-	// =========================
-
+	// ============================
+	// Iniciar servidor
+	// ============================
 	log.Println("Servidor iniciado en http://localhost:8080")
+
 	log.Fatal(http.ListenAndServe(":8080", r))
 }
