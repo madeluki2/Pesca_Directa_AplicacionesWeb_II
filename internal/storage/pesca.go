@@ -3,7 +3,7 @@ package storage
 import (
 	"sync"
 
-	"Proyecto_Aplicaciones_Web_II/internal/models"
+	"Pesca_Directa_AplicacionesWeb_II/internal/models"
 )
 
 // MemoriaPesca guarda todos los datos en RAM mientras la aplicación esté en ejecución. No es persistente.
