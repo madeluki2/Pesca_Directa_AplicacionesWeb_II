@@ -1,6 +1,6 @@
 package storage
 
-import "Proyecto_Aplicaciones_Web_II/internal/models"
+import "Pesca_Directa_AplicacionesWeb_II/internal/models"
 
 // AlmacenPesca define todas las operaciones de persistencia del módulo.
 // Al usar una interfaz, si en el futuro cambias de memoria a SQLite
