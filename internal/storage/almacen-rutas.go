@@ -45,12 +45,4 @@ type AlmacenRutas interface {
 	BorrarEntrega(id uint) bool
 }
 
-// UserRepository: contrato para la persistencia de Usuario (auth).
-// Siempre se sirve desde GORM (UsuarioGORM), nunca desde memoria,
-// porque register/login necesitan persistencia real.
-type UserRepository interface {
-	BuscarUsuarioPorEmail(email string) (models.Usuario, bool)
-	CrearUsuario(u models.Usuario) (models.Usuario, error)
-}
-
 var _ AlmacenRutas = (*AlmacenSQLiteRutas)(nil)
