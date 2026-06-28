@@ -10,8 +10,6 @@ import (
 )
 
 // RespondJSON escribe data como JSON con el status HTTP indicado.
-// Centraliza el Content-Type y WriteHeader para que todos los handlers
-// devuelvan respuestas consistentes.
 func RespondJSON(w http.ResponseWriter, status int, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
@@ -29,48 +27,18 @@ func RespondError(w http.ResponseWriter, status int, mensaje string) {
 }
 
 // statusDeError convierte un error del dominio al código HTTP correspondiente.
-// Cubre los errores de los tres módulos: Pesca, Pedidos y Rutas.
-// Los handlers solo hacen: RespondError(w, statusDeError(err), err.Error())
+// Así los handlers solo hacen: RespondError(w, statusDeError(err), err.Error())
 func statusDeError(err error) int {
 	switch {
-
-	// ── 400 Bad Request ──────────────────────────────────────────────────
-	// Auth compartido
+	// 400 Bad Request — datos inválidos enviados por el cliente
 	case errors.Is(err, service.ErrCredencialesInvalidas),
-		errors.Is(err, service.ErrEmailEnUso):
-		return http.StatusBadRequest
-
-	// Anthony — Gestión de Pesca
-	case errors.Is(err, service.ErrCedulaVacia),
-		errors.Is(err, service.ErrPuertoVacio),
+		errors.Is(err, service.ErrEmailEnUso),
 		errors.Is(err, service.ErrNombreVacio),
-		errors.Is(err, service.ErrMatriculaVacia),
-		errors.Is(err, service.ErrNombreComunVacio),
-		errors.Is(err, service.ErrUnidadMedidaVacia),
-		errors.Is(err, service.ErrCantidadInvalida),
-		errors.Is(err, service.ErrCantidadNegativa),
-		errors.Is(err, service.ErrFechaVacia),
-		errors.Is(err, service.ErrFechaIngresoVacia),
-		errors.Is(err, service.ErrFrescuraInvalida),
-		errors.Is(err, service.ErrUbicacionVacia),
-		errors.Is(err, service.ErrCapacidadInvalida):
-		return http.StatusBadRequest
-
-	// Ilaria — Gestión de Pedidos
-	case errors.Is(err, service.ErrNombreNegocioVacio),
-		errors.Is(err, service.ErrTipoClienteInvalido),
-		errors.Is(err, service.ErrTelefonoVacio),
-		errors.Is(err, service.ErrDireccionVacia),
-		errors.Is(err, service.ErrClienteIDInvalido),
-		errors.Is(err, service.ErrPedidoIDInvalido),
-		errors.Is(err, service.ErrEspecieIDInvalido),
-		errors.Is(err, service.ErrPrecioInvalido):
-		return http.StatusBadRequest
-
-	// Madelyn — Rutas de Distribución
-	case errors.Is(err, service.ErrOrigenVacio),
+		errors.Is(err, service.ErrOrigenVacio),
 		errors.Is(err, service.ErrDestinoVacio),
+		errors.Is(err, service.ErrDireccionVacia),
 		errors.Is(err, service.ErrRutaIDVacio),
+		errors.Is(err, service.ErrTelefonoVacio),
 		errors.Is(err, service.ErrPlacaVacia),
 		errors.Is(err, service.ErrPlacaDuplicada),
 		errors.Is(err, service.ErrPedidoIDVacio),
@@ -78,39 +46,15 @@ func statusDeError(err error) int {
 		errors.Is(err, service.ErrTransportistaIDVacio):
 		return http.StatusBadRequest
 
-	// ── 401 Unauthorized ─────────────────────────────────────────────────
-	// (solo Ilaria lo definió explícito, pero aplica a todos)
-	case errors.Is(err, service.ErrCredencialesInvalidas):
-		return http.StatusUnauthorized
-
-	// ── 404 Not Found ────────────────────────────────────────────────────
-	// Genérico compartido
-	case errors.Is(err, service.ErrNoEncontrado):
-		return http.StatusNotFound
-
-	// Anthony — Gestión de Pesca
-	case errors.Is(err, service.ErrPescadorNoEncontrado),
-		errors.Is(err, service.ErrEmbarcacionNoEncontrada),
-		errors.Is(err, service.ErrEspecieNoEncontrada),
-		errors.Is(err, service.ErrCapturaNoEncontrada),
-		errors.Is(err, service.ErrBodegaNoEncontrada),
-		errors.Is(err, service.ErrStockNoEncontrado):
-		return http.StatusNotFound
-
-	// Ilaria — Gestión de Pedidos
-	case errors.Is(err, service.ErrClienteNoEncontrado),
-		errors.Is(err, service.ErrPedidoNoEncontrado),
-		errors.Is(err, service.ErrDetalleNoEncontrado):
-		return http.StatusNotFound
-
-	// Madelyn — Rutas de Distribución
-	case errors.Is(err, service.ErrRutaNoEncontrada),
+	// 404 Not Found — el recurso pedido no existe
+	case errors.Is(err, service.ErrNoEncontrado),
+		errors.Is(err, service.ErrRutaNoEncontrada),
 		errors.Is(err, service.ErrPuntoNoEncontrado),
 		errors.Is(err, service.ErrTransportistaNoEncontrado),
 		errors.Is(err, service.ErrEntregaNoEncontrada):
 		return http.StatusNotFound
 
-	// ── 500 Internal Server Error ─────────────────────────────────────────
+	// 500 Internal Server Error — cualquier otro error inesperado
 	default:
 		return http.StatusInternalServerError
 	}
