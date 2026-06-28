@@ -2,429 +2,285 @@ package handlers
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 	"strconv"
-	"strings"
-
-	"Pesca_Directa_AplicacionesWeb_II/internal/models"
-	"Pesca_Directa_AplicacionesWeb_II/internal/storage"
 
 	"github.com/go-chi/chi/v5"
+
+	"Pesca_Directa_AplicacionesWeb_II/internal/models"
 )
 
-// ──────────────────────────────────────────────
-// Helper: parsear {id} del path
-// ──────────────────────────────────────────────
-func parseID(r *http.Request) (uint, error) {
+// parseID extrae el parámetro {id} de la URL y lo convierte a uint.
+// Devuelve false si el valor no es un número entero positivo.
+func parseID(r *http.Request) (uint, bool) {
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.ParseUint(idStr, 10, 64)
-	if err != nil {
-		return 0, err
+	if err != nil || id == 0 {
+		return 0, false
 	}
-	return uint(id), nil
+	return uint(id), true
 }
 
-// ══════════════════════════════════════════════
-// RutaHandler
-// ══════════════════════════════════════════════
-type RutaHandler struct{ store storage.AlmacenRuta }
+// ════════════════════════════ RUTAS ═══════════════════════════════════════
 
-func NewRutaHandler(s storage.AlmacenRuta) *RutaHandler { return &RutaHandler{store: s} }
-
-func (h *RutaHandler) Crear(w http.ResponseWriter, r *http.Request) {
-	var ruta models.Ruta
-	if err := json.NewDecoder(r.Body).Decode(&ruta); err != nil {
-		RespondError(w, http.StatusBadRequest, "JSON inválido: "+err.Error())
-		return
-	}
-	if strings.TrimSpace(ruta.Nombre) == "" || strings.TrimSpace(ruta.Origen) == "" || strings.TrimSpace(ruta.Destino) == "" {
-		RespondError(w, http.StatusBadRequest, "nombre, origen y destino son obligatorios")
-		return
-	}
-	if ruta.Estado == "" {
-		ruta.Estado = "activo"
-	}
-	creado, err := h.store.CrearRuta(ruta)
-	if err != nil {
-		RespondError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	RespondJSON(w, http.StatusCreated, creado)
+func (s *Server) ListarRutas(w http.ResponseWriter, r *http.Request) {
+	RespondJSON(w, http.StatusOK, s.Rutas.ListarRutas())
 }
 
-func (h *RutaHandler) ObtenerTodos(w http.ResponseWriter, r *http.Request) {
-	rutas, err := h.store.ObtenerRutas()
-	if err != nil {
-		RespondError(w, http.StatusInternalServerError, err.Error())
+func (s *Server) ObtenerRuta(w http.ResponseWriter, r *http.Request) {
+	id, ok := parseID(r)
+	if !ok {
+		RespondError(w, http.StatusBadRequest, "ID debe ser un número entero positivo")
 		return
 	}
-	RespondJSON(w, http.StatusOK, rutas)
-}
-
-func (h *RutaHandler) ObtenerUno(w http.ResponseWriter, r *http.Request) {
-	id, err := parseID(r)
+	ruta, err := s.Rutas.ObtenerRuta(id)
 	if err != nil {
-		RespondError(w, http.StatusBadRequest, "ID inválido")
-		return
-	}
-	ruta, err := h.store.ObtenerRutaPorID(id)
-	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			RespondError(w, http.StatusNotFound, "ruta no encontrada")
-			return
-		}
-		RespondError(w, http.StatusInternalServerError, err.Error())
+		RespondError(w, statusDeError(err), err.Error())
 		return
 	}
 	RespondJSON(w, http.StatusOK, ruta)
 }
 
-func (h *RutaHandler) Actualizar(w http.ResponseWriter, r *http.Request) {
-	id, err := parseID(r)
-	if err != nil {
-		RespondError(w, http.StatusBadRequest, "ID inválido")
-		return
-	}
-	var ruta models.Ruta
-	if err := json.NewDecoder(r.Body).Decode(&ruta); err != nil {
+func (s *Server) CrearRuta(w http.ResponseWriter, r *http.Request) {
+	var body models.Ruta
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		RespondError(w, http.StatusBadRequest, "JSON inválido: "+err.Error())
 		return
 	}
-	if strings.TrimSpace(ruta.Nombre) == "" || strings.TrimSpace(ruta.Origen) == "" || strings.TrimSpace(ruta.Destino) == "" {
-		RespondError(w, http.StatusBadRequest, "nombre, origen y destino son obligatorios")
-		return
-	}
-	actualizado, err := h.store.ActualizarRuta(id, ruta)
+	ruta, err := s.Rutas.CrearRuta(body)
 	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			RespondError(w, http.StatusNotFound, "ruta no encontrada")
-			return
-		}
-		RespondError(w, http.StatusInternalServerError, err.Error())
+		RespondError(w, statusDeError(err), err.Error())
 		return
 	}
-	RespondJSON(w, http.StatusOK, actualizado)
+	RespondJSON(w, http.StatusCreated, ruta)
 }
 
-func (h *RutaHandler) Eliminar(w http.ResponseWriter, r *http.Request) {
-	id, err := parseID(r)
-	if err != nil {
-		RespondError(w, http.StatusBadRequest, "ID inválido")
+func (s *Server) ActualizarRuta(w http.ResponseWriter, r *http.Request) {
+	id, ok := parseID(r)
+	if !ok {
+		RespondError(w, http.StatusBadRequest, "ID debe ser un número entero positivo")
 		return
 	}
-	if err := h.store.EliminarRuta(id); err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			RespondError(w, http.StatusNotFound, "ruta no encontrada")
-			return
-		}
-		RespondError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	RespondJSON(w, http.StatusOK, map[string]string{"mensaje": "ruta eliminada correctamente"})
-}
-
-// ══════════════════════════════════════════════
-// PuntoHandler
-// ══════════════════════════════════════════════
-type PuntoHandler struct{ store storage.AlmacenRuta }
-
-func NewPuntoHandler(s storage.AlmacenRuta) *PuntoHandler { return &PuntoHandler{store: s} }
-
-func (h *PuntoHandler) Crear(w http.ResponseWriter, r *http.Request) {
-	var punto models.Punto
-	if err := json.NewDecoder(r.Body).Decode(&punto); err != nil {
+	var body models.Ruta
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		RespondError(w, http.StatusBadRequest, "JSON inválido: "+err.Error())
 		return
 	}
-	if strings.TrimSpace(punto.Nombre) == "" || strings.TrimSpace(punto.Direccion) == "" || punto.RutaID == 0 {
-		RespondError(w, http.StatusBadRequest, "nombre, direccion y ruta_id son obligatorios")
-		return
-	}
-	if punto.Estado == "" {
-		punto.Estado = "activo"
-	}
-	creado, err := h.store.CrearPunto(punto)
+	ruta, err := s.Rutas.ActualizarRuta(id, body)
 	if err != nil {
-		RespondError(w, http.StatusInternalServerError, err.Error())
+		RespondError(w, statusDeError(err), err.Error())
 		return
 	}
-	RespondJSON(w, http.StatusCreated, creado)
+	RespondJSON(w, http.StatusOK, ruta)
 }
 
-func (h *PuntoHandler) ObtenerTodos(w http.ResponseWriter, r *http.Request) {
-	puntos, err := h.store.ObtenerPuntos()
-	if err != nil {
-		RespondError(w, http.StatusInternalServerError, err.Error())
+func (s *Server) BorrarRuta(w http.ResponseWriter, r *http.Request) {
+	id, ok := parseID(r)
+	if !ok {
+		RespondError(w, http.StatusBadRequest, "ID debe ser un número entero positivo")
 		return
 	}
-	RespondJSON(w, http.StatusOK, puntos)
+	if err := s.Rutas.BorrarRuta(id); err != nil {
+		RespondError(w, statusDeError(err), err.Error())
+		return
+	}
+	RespondJSON(w, http.StatusNoContent, nil)
 }
 
-func (h *PuntoHandler) ObtenerUno(w http.ResponseWriter, r *http.Request) {
-	id, err := parseID(r)
-	if err != nil {
-		RespondError(w, http.StatusBadRequest, "ID inválido")
+// ════════════════════════════ PUNTOS ══════════════════════════════════════
+
+func (s *Server) ListarPuntos(w http.ResponseWriter, r *http.Request) {
+	RespondJSON(w, http.StatusOK, s.Rutas.ListarPuntos())
+}
+
+func (s *Server) ObtenerPunto(w http.ResponseWriter, r *http.Request) {
+	id, ok := parseID(r)
+	if !ok {
+		RespondError(w, http.StatusBadRequest, "ID debe ser un número entero positivo")
 		return
 	}
-	punto, err := h.store.ObtenerPuntoPorID(id)
+	punto, err := s.Rutas.ObtenerPunto(id)
 	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			RespondError(w, http.StatusNotFound, "punto no encontrado")
-			return
-		}
-		RespondError(w, http.StatusInternalServerError, err.Error())
+		RespondError(w, statusDeError(err), err.Error())
 		return
 	}
 	RespondJSON(w, http.StatusOK, punto)
 }
 
-func (h *PuntoHandler) Actualizar(w http.ResponseWriter, r *http.Request) {
-	id, err := parseID(r)
-	if err != nil {
-		RespondError(w, http.StatusBadRequest, "ID inválido")
-		return
-	}
-	var punto models.Punto
-	if err := json.NewDecoder(r.Body).Decode(&punto); err != nil {
+func (s *Server) CrearPunto(w http.ResponseWriter, r *http.Request) {
+	var body models.Punto
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		RespondError(w, http.StatusBadRequest, "JSON inválido: "+err.Error())
 		return
 	}
-	if strings.TrimSpace(punto.Nombre) == "" || strings.TrimSpace(punto.Direccion) == "" || punto.RutaID == 0 {
-		RespondError(w, http.StatusBadRequest, "nombre, direccion y ruta_id son obligatorios")
-		return
-	}
-	actualizado, err := h.store.ActualizarPunto(id, punto)
+	punto, err := s.Rutas.CrearPunto(body)
 	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			RespondError(w, http.StatusNotFound, "punto no encontrado")
-			return
-		}
-		RespondError(w, http.StatusInternalServerError, err.Error())
+		RespondError(w, statusDeError(err), err.Error())
 		return
 	}
-	RespondJSON(w, http.StatusOK, actualizado)
+	RespondJSON(w, http.StatusCreated, punto)
 }
 
-func (h *PuntoHandler) Eliminar(w http.ResponseWriter, r *http.Request) {
-	id, err := parseID(r)
-	if err != nil {
-		RespondError(w, http.StatusBadRequest, "ID inválido")
+func (s *Server) ActualizarPunto(w http.ResponseWriter, r *http.Request) {
+	id, ok := parseID(r)
+	if !ok {
+		RespondError(w, http.StatusBadRequest, "ID debe ser un número entero positivo")
 		return
 	}
-	if err := h.store.EliminarPunto(id); err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			RespondError(w, http.StatusNotFound, "punto no encontrado")
-			return
-		}
-		RespondError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	RespondJSON(w, http.StatusOK, map[string]string{"mensaje": "punto eliminado correctamente"})
-}
-
-// ══════════════════════════════════════════════
-// TransportistaHandler
-// ══════════════════════════════════════════════
-type TransportistaHandler struct{ store storage.AlmacenRuta }
-
-func NewTransportistaHandler(s storage.AlmacenRuta) *TransportistaHandler {
-	return &TransportistaHandler{store: s}
-}
-
-func (h *TransportistaHandler) Crear(w http.ResponseWriter, r *http.Request) {
-	var t models.Transportista
-	if err := json.NewDecoder(r.Body).Decode(&t); err != nil {
+	var body models.Punto
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		RespondError(w, http.StatusBadRequest, "JSON inválido: "+err.Error())
 		return
 	}
-	if strings.TrimSpace(t.Nombre) == "" || strings.TrimSpace(t.Telefono) == "" || strings.TrimSpace(t.PlacaVehiculo) == "" {
-		RespondError(w, http.StatusBadRequest, "nombre, telefono y placa_vehiculo son obligatorios")
-		return
-	}
-	if t.Estado == "" {
-		t.Estado = "activo"
-	}
-	creado, err := h.store.CrearTransportista(t)
+	punto, err := s.Rutas.ActualizarPunto(id, body)
 	if err != nil {
-		if errors.Is(err, storage.ErrPlacaDuplicada) {
-			RespondError(w, http.StatusBadRequest, "la placa de vehículo ya existe")
-			return
-		}
-		RespondError(w, http.StatusInternalServerError, err.Error())
+		RespondError(w, statusDeError(err), err.Error())
 		return
 	}
-	RespondJSON(w, http.StatusCreated, creado)
+	RespondJSON(w, http.StatusOK, punto)
 }
 
-func (h *TransportistaHandler) ObtenerTodos(w http.ResponseWriter, r *http.Request) {
-	lista, err := h.store.ObtenerTransportistas()
-	if err != nil {
-		RespondError(w, http.StatusInternalServerError, err.Error())
+func (s *Server) BorrarPunto(w http.ResponseWriter, r *http.Request) {
+	id, ok := parseID(r)
+	if !ok {
+		RespondError(w, http.StatusBadRequest, "ID debe ser un número entero positivo")
 		return
 	}
-	RespondJSON(w, http.StatusOK, lista)
+	if err := s.Rutas.BorrarPunto(id); err != nil {
+		RespondError(w, statusDeError(err), err.Error())
+		return
+	}
+	RespondJSON(w, http.StatusNoContent, nil)
 }
 
-func (h *TransportistaHandler) ObtenerUno(w http.ResponseWriter, r *http.Request) {
-	id, err := parseID(r)
-	if err != nil {
-		RespondError(w, http.StatusBadRequest, "ID inválido")
+// ════════════════════════════ TRANSPORTISTAS ══════════════════════════════
+
+func (s *Server) ListarTransportistas(w http.ResponseWriter, r *http.Request) {
+	RespondJSON(w, http.StatusOK, s.Rutas.ListarTransportistas())
+}
+
+func (s *Server) ObtenerTransportista(w http.ResponseWriter, r *http.Request) {
+	id, ok := parseID(r)
+	if !ok {
+		RespondError(w, http.StatusBadRequest, "ID debe ser un número entero positivo")
 		return
 	}
-	t, err := h.store.ObtenerTransportistaPorID(id)
+	t, err := s.Rutas.ObtenerTransportista(id)
 	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			RespondError(w, http.StatusNotFound, "transportista no encontrado")
-			return
-		}
-		RespondError(w, http.StatusInternalServerError, err.Error())
+		RespondError(w, statusDeError(err), err.Error())
 		return
 	}
 	RespondJSON(w, http.StatusOK, t)
 }
 
-func (h *TransportistaHandler) Actualizar(w http.ResponseWriter, r *http.Request) {
-	id, err := parseID(r)
-	if err != nil {
-		RespondError(w, http.StatusBadRequest, "ID inválido")
-		return
-	}
-	var t models.Transportista
-	if err := json.NewDecoder(r.Body).Decode(&t); err != nil {
+func (s *Server) CrearTransportista(w http.ResponseWriter, r *http.Request) {
+	var body models.Transportista
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		RespondError(w, http.StatusBadRequest, "JSON inválido: "+err.Error())
 		return
 	}
-	if strings.TrimSpace(t.Nombre) == "" || strings.TrimSpace(t.Telefono) == "" || strings.TrimSpace(t.PlacaVehiculo) == "" {
-		RespondError(w, http.StatusBadRequest, "nombre, telefono y placa_vehiculo son obligatorios")
-		return
-	}
-	actualizado, err := h.store.ActualizarTransportista(id, t)
+	t, err := s.Rutas.CrearTransportista(body)
 	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			RespondError(w, http.StatusNotFound, "transportista no encontrado")
-			return
-		}
-		RespondError(w, http.StatusInternalServerError, err.Error())
+		RespondError(w, statusDeError(err), err.Error())
 		return
 	}
-	RespondJSON(w, http.StatusOK, actualizado)
+	RespondJSON(w, http.StatusCreated, t)
 }
 
-func (h *TransportistaHandler) Eliminar(w http.ResponseWriter, r *http.Request) {
-	id, err := parseID(r)
-	if err != nil {
-		RespondError(w, http.StatusBadRequest, "ID inválido")
+func (s *Server) ActualizarTransportista(w http.ResponseWriter, r *http.Request) {
+	id, ok := parseID(r)
+	if !ok {
+		RespondError(w, http.StatusBadRequest, "ID debe ser un número entero positivo")
 		return
 	}
-	if err := h.store.EliminarTransportista(id); err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			RespondError(w, http.StatusNotFound, "transportista no encontrado")
-			return
-		}
-		RespondError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	RespondJSON(w, http.StatusOK, map[string]string{"mensaje": "transportista eliminado correctamente"})
-}
-
-// ══════════════════════════════════════════════
-// EntregaHandler
-// ══════════════════════════════════════════════
-type EntregaHandler struct{ store storage.AlmacenRuta }
-
-func NewEntregaHandler(s storage.AlmacenRuta) *EntregaHandler {
-	return &EntregaHandler{store: s}
-}
-
-func (h *EntregaHandler) Crear(w http.ResponseWriter, r *http.Request) {
-	var e models.EntregaPedido
-	if err := json.NewDecoder(r.Body).Decode(&e); err != nil {
+	var body models.Transportista
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		RespondError(w, http.StatusBadRequest, "JSON inválido: "+err.Error())
 		return
 	}
-	if e.PedidoID == 0 || e.PuntoID == 0 || e.TransportistaID == 0 {
-		RespondError(w, http.StatusBadRequest, "pedido_id, punto_id y transportista_id son obligatorios")
-		return
-	}
-	if e.Estado == "" {
-		e.Estado = "pendiente"
-	}
-	creado, err := h.store.CrearEntrega(e)
+	t, err := s.Rutas.ActualizarTransportista(id, body)
 	if err != nil {
-		RespondError(w, http.StatusInternalServerError, err.Error())
+		RespondError(w, statusDeError(err), err.Error())
 		return
 	}
-	RespondJSON(w, http.StatusCreated, creado)
+	RespondJSON(w, http.StatusOK, t)
 }
 
-func (h *EntregaHandler) ObtenerTodos(w http.ResponseWriter, r *http.Request) {
-	lista, err := h.store.ObtenerEntregas()
-	if err != nil {
-		RespondError(w, http.StatusInternalServerError, err.Error())
+func (s *Server) BorrarTransportista(w http.ResponseWriter, r *http.Request) {
+	id, ok := parseID(r)
+	if !ok {
+		RespondError(w, http.StatusBadRequest, "ID debe ser un número entero positivo")
 		return
 	}
-	RespondJSON(w, http.StatusOK, lista)
+	if err := s.Rutas.BorrarTransportista(id); err != nil {
+		RespondError(w, statusDeError(err), err.Error())
+		return
+	}
+	RespondJSON(w, http.StatusNoContent, nil)
 }
 
-func (h *EntregaHandler) ObtenerUno(w http.ResponseWriter, r *http.Request) {
-	id, err := parseID(r)
-	if err != nil {
-		RespondError(w, http.StatusBadRequest, "ID inválido")
+// ════════════════════════════ ENTREGAS ════════════════════════════════════
+
+func (s *Server) ListarEntregas(w http.ResponseWriter, r *http.Request) {
+	RespondJSON(w, http.StatusOK, s.Rutas.ListarEntregas())
+}
+
+func (s *Server) ObtenerEntrega(w http.ResponseWriter, r *http.Request) {
+	id, ok := parseID(r)
+	if !ok {
+		RespondError(w, http.StatusBadRequest, "ID debe ser un número entero positivo")
 		return
 	}
-	e, err := h.store.ObtenerEntregaPorID(id)
+	e, err := s.Rutas.ObtenerEntrega(id)
 	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			RespondError(w, http.StatusNotFound, "entrega no encontrada")
-			return
-		}
-		RespondError(w, http.StatusInternalServerError, err.Error())
+		RespondError(w, statusDeError(err), err.Error())
 		return
 	}
 	RespondJSON(w, http.StatusOK, e)
 }
 
-func (h *EntregaHandler) Actualizar(w http.ResponseWriter, r *http.Request) {
-	id, err := parseID(r)
-	if err != nil {
-		RespondError(w, http.StatusBadRequest, "ID inválido")
-		return
-	}
-	var e models.EntregaPedido
-	if err := json.NewDecoder(r.Body).Decode(&e); err != nil {
+func (s *Server) CrearEntrega(w http.ResponseWriter, r *http.Request) {
+	var body models.EntregaPedido
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		RespondError(w, http.StatusBadRequest, "JSON inválido: "+err.Error())
 		return
 	}
-	if e.PedidoID == 0 || e.PuntoID == 0 || e.TransportistaID == 0 {
-		RespondError(w, http.StatusBadRequest, "pedido_id, punto_id y transportista_id son obligatorios")
-		return
-	}
-	actualizado, err := h.store.ActualizarEntrega(id, e)
+	e, err := s.Rutas.CrearEntrega(body)
 	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			RespondError(w, http.StatusNotFound, "entrega no encontrada")
-			return
-		}
-		RespondError(w, http.StatusInternalServerError, err.Error())
+		RespondError(w, statusDeError(err), err.Error())
 		return
 	}
-	RespondJSON(w, http.StatusOK, actualizado)
+	RespondJSON(w, http.StatusCreated, e)
 }
 
-func (h *EntregaHandler) Eliminar(w http.ResponseWriter, r *http.Request) {
-	id, err := parseID(r)
+func (s *Server) ActualizarEntrega(w http.ResponseWriter, r *http.Request) {
+	id, ok := parseID(r)
+	if !ok {
+		RespondError(w, http.StatusBadRequest, "ID debe ser un número entero positivo")
+		return
+	}
+	var body models.EntregaPedido
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		RespondError(w, http.StatusBadRequest, "JSON inválido: "+err.Error())
+		return
+	}
+	e, err := s.Rutas.ActualizarEntrega(id, body)
 	if err != nil {
-		RespondError(w, http.StatusBadRequest, "ID inválido")
+		RespondError(w, statusDeError(err), err.Error())
 		return
 	}
-	if err := h.store.EliminarEntrega(id); err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			RespondError(w, http.StatusNotFound, "entrega no encontrada")
-			return
-		}
-		RespondError(w, http.StatusInternalServerError, err.Error())
+	RespondJSON(w, http.StatusOK, e)
+}
+
+func (s *Server) BorrarEntrega(w http.ResponseWriter, r *http.Request) {
+	id, ok := parseID(r)
+	if !ok {
+		RespondError(w, http.StatusBadRequest, "ID debe ser un número entero positivo")
 		return
 	}
-	RespondJSON(w, http.StatusOK, map[string]string{"mensaje": "entrega eliminada correctamente"})
+	if err := s.Rutas.BorrarEntrega(id); err != nil {
+		RespondError(w, statusDeError(err), err.Error())
+		return
+	}
+	RespondJSON(w, http.StatusNoContent, nil)
 }

@@ -1,72 +1,98 @@
 package main
 
 import (
-	"fmt"
+	"log"
 	"net/http"
 
+	"github.com/glebarez/sqlite"
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
+	chimw "github.com/go-chi/chi/v5/middleware"
+	"gorm.io/gorm"
 
 	"Pesca_Directa_AplicacionesWeb_II/internal/handlers"
+	"Pesca_Directa_AplicacionesWeb_II/internal/middleware"
+	"Pesca_Directa_AplicacionesWeb_II/internal/models"
+	"Pesca_Directa_AplicacionesWeb_II/internal/service"
 	"Pesca_Directa_AplicacionesWeb_II/internal/storage"
 )
 
 func main() {
-	// ── Instanciar store único en memoria ──────────────
-	store := storage.NuevaMemoriaRutas()
+	// 1. Abre la DB y migra las tablas automáticamente.
+	gdb, err := gorm.Open(sqlite.Open("rutas.db"), &gorm.Config{})
+	if err != nil {
+		log.Fatal("no se pudo abrir la base de datos: ", err)
+	}
+	if err := gdb.AutoMigrate(
+		&models.Usuario{},
+		&models.Ruta{},
+		&models.Punto{},
+		&models.Transportista{},
+		&models.EntregaPedido{},
+	); err != nil {
+		log.Fatal("falló AutoMigrate: ", err)
+	}
 
-	// ── Instanciar handlers ────────────────────────────
-	rutaHandler := handlers.NewRutaHandler(store)
-	puntoHandler := handlers.NewPuntoHandler(store)
-	transportistaHandler := handlers.NewTransportistaHandler(store)
-	entregaHandler := handlers.NewEntregaHandler(store)
+	// 2. Backend único: GORM + SQLite
+	almacen := storage.NuevoAlmacenSQLiteRutas(gdb)
+	log.Println("Backend: GORM + SQLite (rutas.db)")
 
-	// ── Router principal ───────────────────────────────
+	// 3. UserRepository siempre usa GORM (auth necesita persistencia real).
+	usuarioRepo := storage.NewUsuarioGORM(gdb)
+
+	// 4. Services con inyección de dependencias.
+	authService := service.NewAuthService(usuarioRepo)
+	rutasService := service.NewRutasService(almacen)
+
+	// 5. Server agrupa los services para los handlers.
+	servidor := handlers.NewServer(rutasService, authService)
+
+	// 6. Router + middlewares globales.
 	r := chi.NewRouter()
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
+	r.Use(chimw.Logger)
+	r.Use(chimw.Recoverer)
+	r.Use(middleware.CORS)
 
-	// ── Subrouter: módulo Rutas de Distribución ─────────
+	// 7. Rutas versionadas /api/v1/
 	r.Route("/api/v1", func(r chi.Router) {
 
-		// Rutas
-		r.Route("/rutas", func(r chi.Router) {
-			r.Post("/", rutaHandler.Crear)
-			r.Get("/", rutaHandler.ObtenerTodos)
-			r.Get("/{id}", rutaHandler.ObtenerUno)
-			r.Put("/{id}", rutaHandler.Actualizar)
-			r.Delete("/{id}", rutaHandler.Eliminar)
-		})
+		// Públicas — sin token
+		r.Post("/auth/register", servidor.Registrar)
+		r.Post("/auth/login", servidor.Login)
 
-		// Puntos
-		r.Route("/puntos", func(r chi.Router) {
-			r.Post("/", puntoHandler.Crear)
-			r.Get("/", puntoHandler.ObtenerTodos)
-			r.Get("/{id}", puntoHandler.ObtenerUno)
-			r.Put("/{id}", puntoHandler.Actualizar)
-			r.Delete("/{id}", puntoHandler.Eliminar)
-		})
+		// Protegidas — requieren: Authorization: Bearer <token>
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.Auth(authService))
 
-		// Transportistas
-		r.Route("/transportistas", func(r chi.Router) {
-			r.Post("/", transportistaHandler.Crear)
-			r.Get("/", transportistaHandler.ObtenerTodos)
-			r.Get("/{id}", transportistaHandler.ObtenerUno)
-			r.Put("/{id}", transportistaHandler.Actualizar)
-			r.Delete("/{id}", transportistaHandler.Eliminar)
-		})
+			// Rutas
+			r.Get("/rutas", servidor.ListarRutas)
+			r.Post("/rutas", servidor.CrearRuta)
+			r.Get("/rutas/{id}", servidor.ObtenerRuta)
+			r.Put("/rutas/{id}", servidor.ActualizarRuta)
+			r.Delete("/rutas/{id}", servidor.BorrarRuta)
 
-		// Entregas
-		r.Route("/entregas", func(r chi.Router) {
-			r.Post("/", entregaHandler.Crear)
-			r.Get("/", entregaHandler.ObtenerTodos)
-			r.Get("/{id}", entregaHandler.ObtenerUno)
-			r.Put("/{id}", entregaHandler.Actualizar)
-			r.Delete("/{id}", entregaHandler.Eliminar)
+			// Puntos
+			r.Get("/puntos", servidor.ListarPuntos)
+			r.Post("/puntos", servidor.CrearPunto)
+			r.Get("/puntos/{id}", servidor.ObtenerPunto)
+			r.Put("/puntos/{id}", servidor.ActualizarPunto)
+			r.Delete("/puntos/{id}", servidor.BorrarPunto)
+
+			// Transportistas
+			r.Get("/transportistas", servidor.ListarTransportistas)
+			r.Post("/transportistas", servidor.CrearTransportista)
+			r.Get("/transportistas/{id}", servidor.ObtenerTransportista)
+			r.Put("/transportistas/{id}", servidor.ActualizarTransportista)
+			r.Delete("/transportistas/{id}", servidor.BorrarTransportista)
+
+			// Entregas
+			r.Get("/entregas", servidor.ListarEntregas)
+			r.Post("/entregas", servidor.CrearEntrega)
+			r.Get("/entregas/{id}", servidor.ObtenerEntrega)
+			r.Put("/entregas/{id}", servidor.ActualizarEntrega)
+			r.Delete("/entregas/{id}", servidor.BorrarEntrega)
 		})
 	})
 
-	// ── Arrancar servidor ──────────────────────────────
-	fmt.Println("Servidor corriendo en http://localhost:8080")
-	http.ListenAndServe(":8080", r)
+	log.Println("Servidor escuchando en http://localhost:8080")
+	log.Fatal(http.ListenAndServe(":8080", r))
 }

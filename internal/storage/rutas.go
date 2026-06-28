@@ -1,268 +1,169 @@
 package storage
 
 import (
-	"sync"
-	"time"
-
 	"Pesca_Directa_AplicacionesWeb_II/internal/models"
+
+	"gorm.io/gorm"
 )
 
-// ══════════════════════════════════════════════
-// MemoriaRutas (equivalente a MemoriaPesca)
-// ══════════════════════════════════════════════
-
-type MemoriaRutas struct {
-	rutas      []models.Ruta
-	nextRutaID uint
-
-	puntos      []models.Punto
-	nextPuntoID uint
-
-	transportistas []models.Transportista
-	nextTransID    uint
-
-	entregas      []models.EntregaPedido
-	nextEntregaID uint
-
-	mu sync.RWMutex
+// AlmacenSQLiteRutas implementa AlmacenRutas usando GORM + SQLite.
+type AlmacenSQLiteRutas struct {
+	db *gorm.DB
 }
 
-// NuevaMemoriaRutas crea una nueva instancia con IDs iniciando en 1.
-func NuevaMemoriaRutas() *MemoriaRutas {
-	return &MemoriaRutas{
-		rutas:          []models.Ruta{},
-		nextRutaID:     1,
-		puntos:         []models.Punto{},
-		nextPuntoID:    1,
-		transportistas: []models.Transportista{},
-		nextTransID:    1,
-		entregas:       []models.EntregaPedido{},
-		nextEntregaID:  1,
-	}
+// NuevoAlmacenSQLiteRutas es el constructor que main.go llama.
+func NuevoAlmacenSQLiteRutas(db *gorm.DB) *AlmacenSQLiteRutas {
+	return &AlmacenSQLiteRutas{db: db}
 }
-
-// ══════════════════════════════════════════════
-// IMPLEMENTACIONES EN MEMORIA
-// ══════════════════════════════════════════════
 
 // ── Rutas ─────────────────────────────────────
-// ── CRUD de Rutas ─────────────────────────────
-func (m *MemoriaRutas) CrearRuta(r models.Ruta) (models.Ruta, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	r.ID = m.nextRutaID
-	r.CreadoEn = time.Now()
-	m.nextRutaID++
-	m.rutas = append(m.rutas, r)
-	return r, nil
+
+func (s *AlmacenSQLiteRutas) ListarRutas() []models.Ruta {
+	var rutas []models.Ruta
+	s.db.Find(&rutas)
+	return rutas
 }
 
-func (m *MemoriaRutas) ObtenerRutas() ([]models.Ruta, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	return m.rutas, nil
-}
-
-func (m *MemoriaRutas) ObtenerRutaPorID(id uint) (models.Ruta, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	for _, r := range m.rutas {
-		if r.ID == id {
-			return r, nil
-		}
+func (s *AlmacenSQLiteRutas) BuscarRutaPorID(id uint) (models.Ruta, bool) {
+	var r models.Ruta
+	if err := s.db.First(&r, id).Error; err != nil {
+		return models.Ruta{}, false
 	}
-	return models.Ruta{}, ErrNotFound
+	return r, true
 }
 
-func (m *MemoriaRutas) ActualizarRuta(id uint, nuevo models.Ruta) (models.Ruta, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	for i, r := range m.rutas {
-		if r.ID == id {
-			nuevo.ID = id
-			nuevo.CreadoEn = r.CreadoEn
-			m.rutas[i] = nuevo
-			return nuevo, nil
-		}
+func (s *AlmacenSQLiteRutas) CrearRuta(r models.Ruta) models.Ruta {
+	s.db.Create(&r)
+	return r
+}
+
+func (s *AlmacenSQLiteRutas) ActualizarRuta(id uint, nuevo models.Ruta) (models.Ruta, bool) {
+	var r models.Ruta
+	if err := s.db.First(&r, id).Error; err != nil {
+		return models.Ruta{}, false
 	}
-	return models.Ruta{}, ErrNotFound
+	nuevo.ID = id
+	nuevo.CreadoEn = r.CreadoEn
+	s.db.Save(&nuevo)
+	return nuevo, true
 }
 
-func (m *MemoriaRutas) EliminarRuta(id uint) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	for i, r := range m.rutas {
-		if r.ID == id {
-			m.rutas = append(m.rutas[:i], m.rutas[i+1:]...)
-			return nil
-		}
+func (s *AlmacenSQLiteRutas) BorrarRuta(id uint) bool {
+	result := s.db.Delete(&models.Ruta{}, id)
+	return result.RowsAffected > 0
+}
+
+// ── Puntos ────────────────────────────────────
+
+func (s *AlmacenSQLiteRutas) ListarPuntos() []models.Punto {
+	var puntos []models.Punto
+	s.db.Find(&puntos)
+	return puntos
+}
+
+func (s *AlmacenSQLiteRutas) BuscarPuntoPorID(id uint) (models.Punto, bool) {
+	var p models.Punto
+	if err := s.db.First(&p, id).Error; err != nil {
+		return models.Punto{}, false
 	}
-	return ErrNotFound
+	return p, true
 }
 
-// ── CRUD de Puntos ────────────────────────────
-func (m *MemoriaRutas) CrearPunto(p models.Punto) (models.Punto, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	p.ID = m.nextPuntoID
-	p.CreadoEn = time.Now()
-	m.nextPuntoID++
-	m.puntos = append(m.puntos, p)
-	return p, nil
+func (s *AlmacenSQLiteRutas) CrearPunto(p models.Punto) models.Punto {
+	s.db.Create(&p)
+	return p
 }
 
-func (m *MemoriaRutas) ObtenerPuntos() ([]models.Punto, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	return m.puntos, nil
-}
-
-func (m *MemoriaRutas) ObtenerPuntoPorID(id uint) (models.Punto, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	for _, p := range m.puntos {
-		if p.ID == id {
-			return p, nil
-		}
+func (s *AlmacenSQLiteRutas) ActualizarPunto(id uint, nuevo models.Punto) (models.Punto, bool) {
+	var p models.Punto
+	if err := s.db.First(&p, id).Error; err != nil {
+		return models.Punto{}, false
 	}
-	return models.Punto{}, ErrNotFound
+	nuevo.ID = id
+	nuevo.CreadoEn = p.CreadoEn
+	s.db.Save(&nuevo)
+	return nuevo, true
 }
 
-func (m *MemoriaRutas) ActualizarPunto(id uint, nuevo models.Punto) (models.Punto, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	for i, p := range m.puntos {
-		if p.ID == id {
-			nuevo.ID = id
-			nuevo.CreadoEn = p.CreadoEn
-			m.puntos[i] = nuevo
-			return nuevo, nil
-		}
+func (s *AlmacenSQLiteRutas) BorrarPunto(id uint) bool {
+	result := s.db.Delete(&models.Punto{}, id)
+	return result.RowsAffected > 0
+}
+
+// ── Transportistas ────────────────────────────
+
+func (s *AlmacenSQLiteRutas) ListarTransportistas() []models.Transportista {
+	var lista []models.Transportista
+	s.db.Find(&lista)
+	return lista
+}
+
+func (s *AlmacenSQLiteRutas) BuscarTransportistaPorID(id uint) (models.Transportista, bool) {
+	var t models.Transportista
+	if err := s.db.First(&t, id).Error; err != nil {
+		return models.Transportista{}, false
 	}
-	return models.Punto{}, ErrNotFound
+	return t, true
 }
 
-func (m *MemoriaRutas) EliminarPunto(id uint) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	for i, p := range m.puntos {
-		if p.ID == id {
-			m.puntos = append(m.puntos[:i], m.puntos[i+1:]...)
-			return nil
-		}
+func (s *AlmacenSQLiteRutas) CrearTransportista(t models.Transportista) models.Transportista {
+	s.db.Create(&t)
+	return t
+}
+
+func (s *AlmacenSQLiteRutas) ActualizarTransportista(id uint, nuevo models.Transportista) (models.Transportista, bool) {
+	var t models.Transportista
+	if err := s.db.First(&t, id).Error; err != nil {
+		return models.Transportista{}, false
 	}
-	return ErrNotFound
+	nuevo.ID = id
+	nuevo.CreadoEn = t.CreadoEn
+	s.db.Save(&nuevo)
+	return nuevo, true
 }
 
-// ── CRUD de Transportistas ────────────────────
-func (m *MemoriaRutas) CrearTransportista(t models.Transportista) (models.Transportista, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	for _, existing := range m.transportistas {
-		if existing.PlacaVehiculo == t.PlacaVehiculo {
-			return models.Transportista{}, ErrPlacaDuplicada
-		}
+func (s *AlmacenSQLiteRutas) BorrarTransportista(id uint) bool {
+	result := s.db.Delete(&models.Transportista{}, id)
+	return result.RowsAffected > 0
+}
+
+// ── Entregas ──────────────────────────────────
+
+func (s *AlmacenSQLiteRutas) ListarEntregas() []models.EntregaPedido {
+	var lista []models.EntregaPedido
+	s.db.Find(&lista)
+	return lista
+}
+
+func (s *AlmacenSQLiteRutas) BuscarEntregaPorID(id uint) (models.EntregaPedido, bool) {
+	var e models.EntregaPedido
+	if err := s.db.First(&e, id).Error; err != nil {
+		return models.EntregaPedido{}, false
 	}
-	t.ID = m.nextTransID
-	t.CreadoEn = time.Now()
-	m.nextTransID++
-	m.transportistas = append(m.transportistas, t)
-	return t, nil
+	return e, true
 }
 
-func (m *MemoriaRutas) ObtenerTransportistas() ([]models.Transportista, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	return m.transportistas, nil
+
+func (s *AlmacenSQLiteRutas) CrearEntrega(e models.EntregaPedido) models.EntregaPedido {
+	s.db.Create(&e)
+	return e
 }
 
-func (m *MemoriaRutas) ObtenerTransportistaPorID(id uint) (models.Transportista, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	for _, t := range m.transportistas {
-		if t.ID == id {
-			return t, nil
-		}
+func (s *AlmacenSQLiteRutas) ActualizarEntrega(id uint, nuevo models.EntregaPedido) (models.EntregaPedido, bool) {
+	var e models.EntregaPedido
+	if err := s.db.First(&e, id).Error; err != nil {
+		return models.EntregaPedido{}, false
 	}
-	return models.Transportista{}, ErrNotFound
+	nuevo.ID = id
+	nuevo.CreadoEn = e.CreadoEn
+	s.db.Save(&nuevo)
+	return nuevo, true
 }
 
-func (m *MemoriaRutas) ActualizarTransportista(id uint, nuevo models.Transportista) (models.Transportista, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	for i, t := range m.transportistas {
-		if t.ID == id {
-			nuevo.ID = id
-			nuevo.CreadoEn = t.CreadoEn
-			m.transportistas[i] = nuevo
-			return nuevo, nil
-		}
-	}
-	return models.Transportista{}, ErrNotFound
+func (s *AlmacenSQLiteRutas) BorrarEntrega(id uint) bool {
+	result := s.db.Delete(&models.EntregaPedido{}, id)
+	return result.RowsAffected > 0
 }
 
-func (m *MemoriaRutas) EliminarTransportista(id uint) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	for i, t := range m.transportistas {
-		if t.ID == id {
-			m.transportistas = append(m.transportistas[:i], m.transportistas[i+1:]...)
-			return nil
-		}
-	}
-	return ErrNotFound
-}
-
-// ── CRUD de Entregas ──────────────────────────
-func (m *MemoriaRutas) CrearEntrega(e models.EntregaPedido) (models.EntregaPedido, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	e.ID = m.nextEntregaID
-	e.CreadoEn = time.Now()
-	m.nextEntregaID++
-	m.entregas = append(m.entregas, e)
-	return e, nil
-}
-
-func (m *MemoriaRutas) ObtenerEntregas() ([]models.EntregaPedido, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	return m.entregas, nil
-}
-
-func (m *MemoriaRutas) ObtenerEntregaPorID(id uint) (models.EntregaPedido, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	for _, e := range m.entregas {
-		if e.ID == id {
-			return e, nil
-		}
-	}
-	return models.EntregaPedido{}, ErrNotFound
-}
-
-func (m *MemoriaRutas) ActualizarEntrega(id uint, nuevo models.EntregaPedido) (models.EntregaPedido, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	for i, e := range m.entregas {
-		if e.ID == id {
-			nuevo.ID = id
-			nuevo.CreadoEn = e.CreadoEn
-			m.entregas[i] = nuevo
-			return nuevo, nil
-		}
-	}
-	return models.EntregaPedido{}, ErrNotFound
-}
-
-func (m *MemoriaRutas) EliminarEntrega(id uint) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	for i, e := range m.entregas {
-		if e.ID == id {
-			m.entregas = append(m.entregas[:i], m.entregas[i+1:]...)
-			return nil
-		}
-	}
-	return ErrNotFound
-}
+// Verificación en tiempo de compilación: AlmacenSQLiteRutas implementa AlmacenRutas.
+var _ AlmacenRutas = (*AlmacenSQLiteRutas)(nil)
