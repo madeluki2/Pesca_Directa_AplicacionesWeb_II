@@ -2,6 +2,8 @@ package storage
 
 import "Pesca_Directa_AplicacionesWeb_II/internal/models"
 
+// Los repositorios por entidad ,cada interfaz solo conoce las operaciones de su entidad, esto permite que los services dependan solo de lo que necesitan, y no no de todo el almacén completo
+
 type PescadorRepository interface {
 	ListarPescadores() []models.Pescador
 	BuscarPescadorPorID(id int) (models.Pescador, bool)
@@ -60,13 +62,12 @@ type AlmacenPesca interface {
 	StockRepository
 }
 
-// UserRepository une todos los repositorios del módulo de usuarios.
 type UserRepository interface {
 	CrearUsuario(u models.Usuario) (models.Usuario, error)
 	BuscarUsuarioPorEmail(email string) (models.Usuario, bool)
 }
 
-// Verificación
+// Verificaciones en tiempo de compilación.
 var _ AlmacenPesca = (*MemoriaPesca)(nil)
 var _ AlmacenPesca = (*AlmacenSQLitePesca)(nil)
 var _ UserRepository = (*UsuarioGORM)(nil)
