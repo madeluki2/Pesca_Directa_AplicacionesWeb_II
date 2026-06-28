@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/glebarez/sqlite" // driver GORM (pure-Go, sin CGO)
+	"github.com/glebarez/sqlite"
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
 	"gorm.io/gorm"
@@ -20,27 +20,21 @@ import (
 
 func main() {
 	// ── 1. GORM: dueño del esquema ───────────────────────────────────────
-	// Abre un único archivo pesca.db y migra TODAS las tablas de los tres
-	// módulos. Si el archivo no existe, lo crea desde cero.
 	gdb, err := gorm.Open(sqlite.Open("pesca.db"), &gorm.Config{})
 	if err != nil {
 		log.Fatal("no se pudo abrir la base de datos: ", err)
 	}
 	if err := gdb.AutoMigrate(
-		// Auth (compartido)
 		&models.Usuario{},
-		// Módulo Anthony — Gestión de Pesca
 		&models.Pescador{},
 		&models.Embarcacion{},
 		&models.Especie{},
 		&models.Captura{},
 		&models.Bodega{},
 		&models.Stock{},
-		// Módulo Ilaria — Gestión de Pedidos
 		&models.Cliente{},
 		&models.Pedido{},
 		&models.DetallePedido{},
-		// Módulo Madelyn — Rutas de Distribución
 		&models.Ruta{},
 		&models.Punto{},
 		&models.Transportista{},
@@ -50,9 +44,6 @@ func main() {
 	}
 
 	// ── 2. Elegir el backend según la variable STORAGE ───────────────────
-	// STORAGE=memoria → RAM (datos volátiles, útil para pruebas rápidas)
-	// por defecto      → GORM + SQLite (pesca.db, datos persistentes)
-	// >>> Esta es la ÚNICA decisión que cambia entre backends. <<<
 	var almacenPesca storage.AlmacenPesca
 	var almacenPedidos storage.Almacen
 	var almacenRutas storage.AlmacenRutas
@@ -63,7 +54,7 @@ func main() {
 		m := storage.NewMemoria()
 		m.Seed()
 		almacenPedidos = m
-		almacenRutas = storage.NewMemoriaRutas()
+		almacenRutas = storage.NuevoAlmacenSQLiteRutas(gdb)
 		log.Println("Backend de almacenamiento: Memoria (datos volátiles)")
 	default:
 		almacenPesca = storage.NuevoAlmacenSQLitePesca(gdb)
@@ -73,11 +64,9 @@ func main() {
 	}
 
 	// ── 3. UserRepository: siempre GORM ─────────────────────────────────
-	// El registro y login necesitan persistencia real (bcrypt + JWT).
 	usuarioRepo := storage.NewUsuarioGORM(gdb)
 
 	// ── 4. Services con inyección de dependencias ────────────────────────
-	// Los services no saben qué backend recibieron — solo conocen interfaces.
 	authService := service.NewAuthService(usuarioRepo)
 	pescaService := service.NewPescaService(almacenPesca)
 	pedidoService := service.NewPedidoService(almacenPedidos)
