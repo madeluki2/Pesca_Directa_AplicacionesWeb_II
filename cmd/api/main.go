@@ -1,4 +1,3 @@
-// Command pesca-api arranca el servidor HTTP de Pesca-Directa Tarqui.
 package main
 
 import (
@@ -6,7 +5,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/glebarez/sqlite" // driver GORM (pure-Go, sin CGO)
+	"github.com/glebarez/sqlite"
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
 	"gorm.io/gorm"
