@@ -11,7 +11,7 @@ import (
 	"Pesca_Directa_AplicacionesWeb_II/internal/storage"
 )
 
-var secretJWT = []byte("rutas-distribucion-tarqui-secret-2026")
+var secretJWT = []byte("pesca-directa-tarqui-secret-2026")
 
 const duracionToken = 24 * time.Hour
 
