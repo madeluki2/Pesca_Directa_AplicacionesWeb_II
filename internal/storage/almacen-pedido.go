@@ -48,3 +48,7 @@ type Almacen interface {
 // Chequeo en tiempo de compilación: si Memoria dejara de cumplir Almacen,
 // el proyecto NO compila.
 var _ Almacen = (*Memoria)(nil)
+
+// Chequeo en tiempo de compilación: si AlmacenSQLite dejara de cumplir Almacen,
+// el proyecto NO compila.
+var _ Almacen = (*AlmacenSQLite)(nil)

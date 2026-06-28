@@ -46,3 +46,5 @@ type AlmacenRutas interface {
 }
 
 var _ AlmacenRutas = (*AlmacenSQLiteRutas)(nil)
+
+var _ AlmacenRutas = (*MemoriaRutas)(nil)
