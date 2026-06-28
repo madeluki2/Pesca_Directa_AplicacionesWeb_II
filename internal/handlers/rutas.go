@@ -10,9 +10,8 @@ import (
 	"Pesca_Directa_AplicacionesWeb_II/internal/models"
 )
 
-// parseID extrae el parámetro {id} de la URL y lo convierte a uint.
-// Devuelve false si el valor no es un número entero positivo.
-func parseID(r *http.Request) (uint, bool) {
+// parseUintID extrae el parámetro {id} de la URL y lo convierte a uint.
+func parseUintID(r *http.Request) (uint, bool) {
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.ParseUint(idStr, 10, 64)
 	if err != nil || id == 0 {
@@ -28,7 +27,7 @@ func (s *Server) ListarRutas(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) ObtenerRuta(w http.ResponseWriter, r *http.Request) {
-	id, ok := parseID(r)
+	id, ok := parseUintID(r)
 	if !ok {
 		RespondError(w, http.StatusBadRequest, "ID debe ser un número entero positivo")
 		return
@@ -56,7 +55,7 @@ func (s *Server) CrearRuta(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) ActualizarRuta(w http.ResponseWriter, r *http.Request) {
-	id, ok := parseID(r)
+	id, ok := parseUintID(r)
 	if !ok {
 		RespondError(w, http.StatusBadRequest, "ID debe ser un número entero positivo")
 		return
@@ -75,7 +74,7 @@ func (s *Server) ActualizarRuta(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) BorrarRuta(w http.ResponseWriter, r *http.Request) {
-	id, ok := parseID(r)
+	id, ok := parseUintID(r)
 	if !ok {
 		RespondError(w, http.StatusBadRequest, "ID debe ser un número entero positivo")
 		return
@@ -94,7 +93,7 @@ func (s *Server) ListarPuntos(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) ObtenerPunto(w http.ResponseWriter, r *http.Request) {
-	id, ok := parseID(r)
+	id, ok := parseUintID(r)
 	if !ok {
 		RespondError(w, http.StatusBadRequest, "ID debe ser un número entero positivo")
 		return
@@ -122,7 +121,7 @@ func (s *Server) CrearPunto(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) ActualizarPunto(w http.ResponseWriter, r *http.Request) {
-	id, ok := parseID(r)
+	id, ok := parseUintID(r)
 	if !ok {
 		RespondError(w, http.StatusBadRequest, "ID debe ser un número entero positivo")
 		return
@@ -141,7 +140,7 @@ func (s *Server) ActualizarPunto(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) BorrarPunto(w http.ResponseWriter, r *http.Request) {
-	id, ok := parseID(r)
+	id, ok := parseUintID(r)
 	if !ok {
 		RespondError(w, http.StatusBadRequest, "ID debe ser un número entero positivo")
 		return
@@ -160,7 +159,7 @@ func (s *Server) ListarTransportistas(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) ObtenerTransportista(w http.ResponseWriter, r *http.Request) {
-	id, ok := parseID(r)
+	id, ok := parseUintID(r)
 	if !ok {
 		RespondError(w, http.StatusBadRequest, "ID debe ser un número entero positivo")
 		return
@@ -188,7 +187,7 @@ func (s *Server) CrearTransportista(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) ActualizarTransportista(w http.ResponseWriter, r *http.Request) {
-	id, ok := parseID(r)
+	id, ok := parseUintID(r)
 	if !ok {
 		RespondError(w, http.StatusBadRequest, "ID debe ser un número entero positivo")
 		return
@@ -207,7 +206,7 @@ func (s *Server) ActualizarTransportista(w http.ResponseWriter, r *http.Request)
 }
 
 func (s *Server) BorrarTransportista(w http.ResponseWriter, r *http.Request) {
-	id, ok := parseID(r)
+	id, ok := parseUintID(r)
 	if !ok {
 		RespondError(w, http.StatusBadRequest, "ID debe ser un número entero positivo")
 		return
@@ -226,7 +225,7 @@ func (s *Server) ListarEntregas(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) ObtenerEntrega(w http.ResponseWriter, r *http.Request) {
-	id, ok := parseID(r)
+	id, ok := parseUintID(r)
 	if !ok {
 		RespondError(w, http.StatusBadRequest, "ID debe ser un número entero positivo")
 		return
@@ -254,7 +253,7 @@ func (s *Server) CrearEntrega(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) ActualizarEntrega(w http.ResponseWriter, r *http.Request) {
-	id, ok := parseID(r)
+	id, ok := parseUintID(r)
 	if !ok {
 		RespondError(w, http.StatusBadRequest, "ID debe ser un número entero positivo")
 		return
@@ -273,7 +272,7 @@ func (s *Server) ActualizarEntrega(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) BorrarEntrega(w http.ResponseWriter, r *http.Request) {
-	id, ok := parseID(r)
+	id, ok := parseUintID(r)
 	if !ok {
 		RespondError(w, http.StatusBadRequest, "ID debe ser un número entero positivo")
 		return
