@@ -4,16 +4,27 @@ import (
 	"Pesca_Directa_AplicacionesWeb_II/internal/service"
 )
 
-// Server agrupa todos los services que los handlers necesitan.
-// Al inyectarlos aquí, los handlers nunca dependen del storage directamente.
+// Server agrupa los tres services del proyecto.
+// Los handlers nunca dependen del storage directamente —
+// solo conocen los services que reciben aquí.
 type Server struct {
-	Pesca *service.PescaService
-	Auth  *service.AuthService
+	Pesca   *service.PescaService  // Anthony  — Gestión de Pesca
+	Pedidos *service.PedidoService // Ilaria   — Gestión de Pedidos
+	Rutas   *service.RutasService  // Madelyn  — Rutas de Distribución
+	Auth    *service.AuthService   // Compartido — autenticación JWT
 }
 
-func NewServer(pesca *service.PescaService, auth *service.AuthService) *Server {
+// NewServer crea el servidor con todos los services inyectados.
+func NewServer(
+	pesca *service.PescaService,
+	pedidos *service.PedidoService,
+	rutas *service.RutasService,
+	auth *service.AuthService,
+) *Server {
 	return &Server{
-		Pesca: pesca,
-		Auth:  auth,
+		Pesca:   pesca,
+		Pedidos: pedidos,
+		Rutas:   rutas,
+		Auth:    auth,
 	}
 }
