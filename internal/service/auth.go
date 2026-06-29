@@ -11,7 +11,7 @@ import (
 	"Pesca_Directa_AplicacionesWeb_II/internal/storage"
 )
 
-var secretJWT = []byte("pesca-directa-tarqui-secret-2026")
+var SecretJWT = []byte("pesca-directa-tarqui-secret-2026")
 
 const duracionToken = 24 * time.Hour
 
@@ -79,7 +79,7 @@ func (s *AuthService) GenerarToken(u models.Usuario) (string, error) {
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(secretJWT)
+	return token.SignedString(SecretJWT)
 }
 
 // ValidarToken parsea el token, verifica la firma y devuelve el UsuarioID.
@@ -88,7 +88,7 @@ func (s *AuthService) ValidarToken(tokenStr string) (int, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, ErrCredencialesInvalidas
 		}
-		return secretJWT, nil
+		return SecretJWT, nil
 	})
 	if err != nil || !parsedToken.Valid {
 		return 0, ErrCredencialesInvalidas
