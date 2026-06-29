@@ -34,7 +34,9 @@ type usuarioFakeRutas struct {
 	nextID int
 }
 
-func nuevoUsuarioFakeRutas() *usuarioFakeRutas { return &usuarioFakeRutas{nextID: 1} }
+func nuevoUsuarioFakeRutas() *usuarioFakeRutas {
+	return &usuarioFakeRutas{nextID: 1}
+}
 
 func (u *usuarioFakeRutas) CrearUsuario(usr models.Usuario) (models.Usuario, error) {
 	usr.ID = u.nextID
