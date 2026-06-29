@@ -45,8 +45,14 @@ func (m *rutaRepoMock) BorrarRuta(id uint) bool {
 	return true
 }
 
-func (m *rutaRepoMock) ListarPuntos() []models.Punto                                 { return nil }
-func (m *rutaRepoMock) BuscarPuntoPorID(id uint) (models.Punto, bool)                { return models.Punto{}, false }
+func (m *rutaRepoMock) ListarPuntos() []models.Punto {
+	return nil
+}
+
+func (m *rutaRepoMock) BuscarPuntoPorID(id uint) (models.Punto, bool) {
+	return models.Punto{}, false
+}
+
 func (m *rutaRepoMock) CrearPunto(p models.Punto) models.Punto                       { return p }
 func (m *rutaRepoMock) ActualizarPunto(id uint, d models.Punto) (models.Punto, bool) { return d, true }
 func (m *rutaRepoMock) BorrarPunto(id uint) bool                                     { return true }
