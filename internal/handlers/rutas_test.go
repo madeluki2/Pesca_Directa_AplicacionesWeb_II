@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 	"time"
 
@@ -174,4 +175,91 @@ func TestHandler_CrearRuta_NombreVacio_Devuelve400(t *testing.T) {
 	router.ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusBadRequest, rec.Code, "body: %s", rec.Body.String())
+}
+
+// Test 200 — GET /rutas con token válido debe responder 200 y una lista (vacía al inicio).
+func TestHandler_GetRutas_ConTokenValido_Devuelve200(t *testing.T) {
+	router, auth := nuevoRouterTestRutas(t)
+	token := generarTokenTestRutas(t, auth)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/rutas", nil)
+	req.Header.Set("Authorization", token)
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code, "body: %s", rec.Body.String())
+
+	var lista []models.Ruta
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &lista))
+}
+
+// Test 401 — POST /rutas SIN token debe devolver 401.
+func TestHandler_CrearRuta_SinToken_Devuelve401(t *testing.T) {
+	router, _ := nuevoRouterTestRutas(t)
+
+	cuerpo, _ := json.Marshal(models.Ruta{Nombre: "Ruta X", Origen: "A", Destino: "B"})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/rutas", bytes.NewReader(cuerpo))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+}
+
+// Test 401 — Token mal formado (sin "Bearer", basura) debe devolver 401.
+func TestHandler_GetRutas_TokenMalformado_Devuelve401(t *testing.T) {
+	router, _ := nuevoRouterTestRutas(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/rutas", nil)
+	req.Header.Set("Authorization", "esto-no-es-un-token-valido")
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+}
+
+// Test 400 — POST /rutas con JSON corrupto (no parsea) debe devolver 400.
+func TestHandler_CrearRuta_JSONInvalido_Devuelve400(t *testing.T) {
+	router, auth := nuevoRouterTestRutas(t)
+	token := generarTokenTestRutas(t, auth)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/rutas", bytes.NewReader([]byte("{esto no es json")))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", token)
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code, "body: %s", rec.Body.String())
+}
+
+// Test 200 — Crear una ruta y luego obtenerla por ID debe devolver 200 con los mismos datos.
+func TestHandler_CrearYObtenerRuta_Devuelve200(t *testing.T) {
+	router, auth := nuevoRouterTestRutas(t)
+	token := generarTokenTestRutas(t, auth)
+
+	cuerpo, _ := json.Marshal(models.Ruta{Nombre: "Ruta Centro", Origen: "Puerto", Destino: "Mercado"})
+	reqCrear := httptest.NewRequest(http.MethodPost, "/api/v1/rutas", bytes.NewReader(cuerpo))
+	reqCrear.Header.Set("Content-Type", "application/json")
+	reqCrear.Header.Set("Authorization", token)
+	recCrear := httptest.NewRecorder()
+	router.ServeHTTP(recCrear, reqCrear)
+	require.Equal(t, http.StatusCreated, recCrear.Code, "body: %s", recCrear.Body.String())
+
+	var creada models.Ruta
+	require.NoError(t, json.Unmarshal(recCrear.Body.Bytes(), &creada))
+	idStr := strconv.Itoa(int(creada.ID))
+	reqObtener := httptest.NewRequest(http.MethodGet, "/api/v1/rutas/"+idStr, nil)
+	reqObtener.Header.Set("Authorization", token)
+	recObtener := httptest.NewRecorder()
+	router.ServeHTTP(recObtener, reqObtener)
+
+	assert.Equal(t, http.StatusOK, recObtener.Code, "body: %s", recObtener.Body.String())
+
+	var obtenida models.Ruta
+	require.NoError(t, json.Unmarshal(recObtener.Body.Bytes(), &obtenida))
+	assert.Equal(t, "Ruta Centro", obtenida.Nombre)
 }
