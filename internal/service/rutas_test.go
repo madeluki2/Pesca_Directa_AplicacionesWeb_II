@@ -10,11 +10,38 @@ import (
 )
 
 // ─── Mock manual de AlmacenRutas ─────────────────────────────────────────────
+//
+// Los campos *Func son "ganchos" opcionales: si los dejas en nil, el mock usa
+// el comportamiento por defecto (el mismo que ya tenías). Si los rellenas en
+// un test concreto, controlas exactamente qué devuelve el repo en ese caso
+// (ej: "simula que la ruta no existe", "simula una placa duplicada", etc.)
 
 type rutaRepoMock struct {
 	llamaronRuta          bool
 	llamaronTransportista bool
+	llamaronPunto         bool
+	llamaronEntrega       bool
 	guardada              models.Ruta
+
+	listarRutasFunc     func() []models.Ruta
+	buscarRutaPorIDFunc func(id uint) (models.Ruta, bool)
+	actualizarRutaFunc  func(id uint, d models.Ruta) (models.Ruta, bool)
+	borrarRutaFunc      func(id uint) bool
+
+	listarPuntosFunc     func() []models.Punto
+	buscarPuntoPorIDFunc func(id uint) (models.Punto, bool)
+	actualizarPuntoFunc  func(id uint, d models.Punto) (models.Punto, bool)
+	borrarPuntoFunc      func(id uint) bool
+
+	listarTransportistasFunc     func() []models.Transportista
+	buscarTransportistaPorIDFunc func(id uint) (models.Transportista, bool)
+	actualizarTransportistaFunc  func(id uint, d models.Transportista) (models.Transportista, bool)
+	borrarTransportistaFunc      func(id uint) bool
+
+	listarEntregasFunc     func() []models.EntregaPedido
+	buscarEntregaPorIDFunc func(id uint) (models.EntregaPedido, bool)
+	actualizarEntregaFunc  func(id uint, d models.EntregaPedido) (models.EntregaPedido, bool)
+	borrarEntregaFunc      func(id uint) bool
 }
 
 func (m *rutaRepoMock) CrearRuta(r models.Ruta) models.Ruta {
@@ -23,40 +50,140 @@ func (m *rutaRepoMock) CrearRuta(r models.Ruta) models.Ruta {
 	m.guardada = r
 	return r
 }
+
 func (m *rutaRepoMock) CrearTransportista(t models.Transportista) models.Transportista {
 	m.llamaronTransportista = true
 	t.ID = 1
 	return t
 }
 
-func (m *rutaRepoMock) ListarRutas() []models.Ruta                                   { return nil }
-func (m *rutaRepoMock) BuscarRutaPorID(id uint) (models.Ruta, bool)                  { return models.Ruta{}, false }
-func (m *rutaRepoMock) ActualizarRuta(id uint, d models.Ruta) (models.Ruta, bool)    { return d, true }
-func (m *rutaRepoMock) BorrarRuta(id uint) bool                                      { return true }
-func (m *rutaRepoMock) ListarPuntos() []models.Punto                                 { return nil }
-func (m *rutaRepoMock) BuscarPuntoPorID(id uint) (models.Punto, bool)                { return models.Punto{}, false }
-func (m *rutaRepoMock) CrearPunto(p models.Punto) models.Punto                       { return p }
-func (m *rutaRepoMock) ActualizarPunto(id uint, d models.Punto) (models.Punto, bool) { return d, true }
-func (m *rutaRepoMock) BorrarPunto(id uint) bool                                     { return true }
-func (m *rutaRepoMock) ListarTransportistas() []models.Transportista                 { return nil }
+// NOTA: si tu models.Punto NO tiene campo ID, borra la línea "p.ID = 1".
+func (m *rutaRepoMock) CrearPunto(p models.Punto) models.Punto {
+	m.llamaronPunto = true
+	p.ID = 1
+	return p
+}
+
+// NOTA: si tu models.EntregaPedido NO tiene campo ID, borra la línea "e.ID = 1".
+func (m *rutaRepoMock) CrearEntrega(e models.EntregaPedido) models.EntregaPedido {
+	m.llamaronEntrega = true
+	e.ID = 1
+	return e
+}
+
+func (m *rutaRepoMock) ListarRutas() []models.Ruta {
+	if m.listarRutasFunc != nil {
+		return m.listarRutasFunc()
+	}
+	return nil
+}
+
+func (m *rutaRepoMock) BuscarRutaPorID(id uint) (models.Ruta, bool) {
+	if m.buscarRutaPorIDFunc != nil {
+		return m.buscarRutaPorIDFunc(id)
+	}
+	return models.Ruta{}, false
+}
+
+func (m *rutaRepoMock) ActualizarRuta(id uint, d models.Ruta) (models.Ruta, bool) {
+	if m.actualizarRutaFunc != nil {
+		return m.actualizarRutaFunc(id, d)
+	}
+	return d, true
+}
+
+func (m *rutaRepoMock) BorrarRuta(id uint) bool {
+	if m.borrarRutaFunc != nil {
+		return m.borrarRutaFunc(id)
+	}
+	return true
+}
+
+func (m *rutaRepoMock) ListarPuntos() []models.Punto {
+	if m.listarPuntosFunc != nil {
+		return m.listarPuntosFunc()
+	}
+	return nil
+}
+
+func (m *rutaRepoMock) BuscarPuntoPorID(id uint) (models.Punto, bool) {
+	if m.buscarPuntoPorIDFunc != nil {
+		return m.buscarPuntoPorIDFunc(id)
+	}
+	return models.Punto{}, false
+}
+
+func (m *rutaRepoMock) ActualizarPunto(id uint, d models.Punto) (models.Punto, bool) {
+	if m.actualizarPuntoFunc != nil {
+		return m.actualizarPuntoFunc(id, d)
+	}
+	return d, true
+}
+
+func (m *rutaRepoMock) BorrarPunto(id uint) bool {
+	if m.borrarPuntoFunc != nil {
+		return m.borrarPuntoFunc(id)
+	}
+	return true
+}
+
+func (m *rutaRepoMock) ListarTransportistas() []models.Transportista {
+	if m.listarTransportistasFunc != nil {
+		return m.listarTransportistasFunc()
+	}
+	return nil
+}
+
 func (m *rutaRepoMock) BuscarTransportistaPorID(id uint) (models.Transportista, bool) {
+	if m.buscarTransportistaPorIDFunc != nil {
+		return m.buscarTransportistaPorIDFunc(id)
+	}
 	return models.Transportista{}, false
 }
+
 func (m *rutaRepoMock) ActualizarTransportista(id uint, d models.Transportista) (models.Transportista, bool) {
+	if m.actualizarTransportistaFunc != nil {
+		return m.actualizarTransportistaFunc(id, d)
+	}
 	return d, true
 }
-func (m *rutaRepoMock) BorrarTransportista(id uint) bool       { return true }
-func (m *rutaRepoMock) ListarEntregas() []models.EntregaPedido { return nil }
+
+func (m *rutaRepoMock) BorrarTransportista(id uint) bool {
+	if m.borrarTransportistaFunc != nil {
+		return m.borrarTransportistaFunc(id)
+	}
+	return true
+}
+
+func (m *rutaRepoMock) ListarEntregas() []models.EntregaPedido {
+	if m.listarEntregasFunc != nil {
+		return m.listarEntregasFunc()
+	}
+	return nil
+}
+
 func (m *rutaRepoMock) BuscarEntregaPorID(id uint) (models.EntregaPedido, bool) {
+	if m.buscarEntregaPorIDFunc != nil {
+		return m.buscarEntregaPorIDFunc(id)
+	}
 	return models.EntregaPedido{}, false
 }
-func (m *rutaRepoMock) CrearEntrega(e models.EntregaPedido) models.EntregaPedido { return e }
+
 func (m *rutaRepoMock) ActualizarEntrega(id uint, d models.EntregaPedido) (models.EntregaPedido, bool) {
+	if m.actualizarEntregaFunc != nil {
+		return m.actualizarEntregaFunc(id, d)
+	}
 	return d, true
 }
-func (m *rutaRepoMock) BorrarEntrega(id uint) bool { return true }
 
-// ─── Test CrearRuta ───────────────────────────────────────────────────────────
+func (m *rutaRepoMock) BorrarEntrega(id uint) bool {
+	if m.borrarEntregaFunc != nil {
+		return m.borrarEntregaFunc(id)
+	}
+	return true
+}
+
+// ─── Test CrearRuta (ya lo tenías, sin cambios) ──────────────────────────────
 
 func TestRutasService_CrearRuta(t *testing.T) {
 	casos := []struct {
@@ -111,7 +238,7 @@ func TestRutasService_CrearRuta(t *testing.T) {
 	}
 }
 
-// ─── Test CrearTransportista ──────────────────────────────────────────────────
+// ─── Test CrearTransportista (ya lo tenías, sin cambios) ────────────────────
 
 func TestRutasService_CrearTransportista(t *testing.T) {
 	casos := []struct {
@@ -163,4 +290,564 @@ func TestRutasService_CrearTransportista(t *testing.T) {
 			}
 		})
 	}
+}
+
+// ═══════════════════════════ RUTAS — nuevos tests ════════════════════════
+
+func TestRutasService_ListarRutas(t *testing.T) {
+	esperadas := []models.Ruta{
+		{ID: 1, Nombre: "Ruta Norte", Origen: "Puerto", Destino: "Mercado"},
+		{ID: 2, Nombre: "Ruta Sur", Origen: "Puerto", Destino: "Mercado"},
+	}
+	repo := &rutaRepoMock{listarRutasFunc: func() []models.Ruta { return esperadas }}
+	svc := NewRutasService(repo)
+
+	resultado := svc.ListarRutas()
+
+	assert.Equal(t, esperadas, resultado)
+}
+
+func TestRutasService_ObtenerRuta(t *testing.T) {
+	t.Run("ruta existente → la devuelve sin error", func(t *testing.T) {
+		esperada := models.Ruta{ID: 5, Nombre: "Ruta Norte", Origen: "Puerto", Destino: "Mercado"}
+		repo := &rutaRepoMock{
+			buscarRutaPorIDFunc: func(id uint) (models.Ruta, bool) {
+				assert.Equal(t, uint(5), id, "se consultó un ID distinto al esperado")
+				return esperada, true
+			},
+		}
+		svc := NewRutasService(repo)
+
+		resultado, err := svc.ObtenerRuta(5)
+
+		require.NoError(t, err)
+		assert.Equal(t, esperada, resultado)
+	})
+
+	t.Run("ruta inexistente → ErrRutaNoEncontrada", func(t *testing.T) {
+		repo := &rutaRepoMock{
+			buscarRutaPorIDFunc: func(id uint) (models.Ruta, bool) { return models.Ruta{}, false },
+		}
+		svc := NewRutasService(repo)
+
+		_, err := svc.ObtenerRuta(999)
+
+		require.ErrorIs(t, err, ErrRutaNoEncontrada)
+	})
+}
+
+func TestRutasService_ActualizarRuta(t *testing.T) {
+	t.Run("datos inválidos → no llega a tocar el repo", func(t *testing.T) {
+		repo := &rutaRepoMock{
+			actualizarRutaFunc: func(id uint, d models.Ruta) (models.Ruta, bool) {
+				t.Fatal("no debía llamarse a ActualizarRuta con datos inválidos")
+				return models.Ruta{}, false
+			},
+		}
+		svc := NewRutasService(repo)
+
+		_, err := svc.ActualizarRuta(1, models.Ruta{Nombre: "", Origen: "Puerto", Destino: "Mercado"})
+
+		require.ErrorIs(t, err, ErrNombreVacio)
+	})
+
+	t.Run("ruta inexistente → ErrRutaNoEncontrada", func(t *testing.T) {
+		repo := &rutaRepoMock{
+			actualizarRutaFunc: func(id uint, d models.Ruta) (models.Ruta, bool) { return models.Ruta{}, false },
+		}
+		svc := NewRutasService(repo)
+
+		_, err := svc.ActualizarRuta(1, models.Ruta{Nombre: "Ruta Norte", Origen: "Puerto", Destino: "Mercado"})
+
+		require.ErrorIs(t, err, ErrRutaNoEncontrada)
+	})
+
+	t.Run("datos válidos → actualiza correctamente", func(t *testing.T) {
+		datos := models.Ruta{Nombre: "Ruta Norte", Origen: "Puerto", Destino: "Mercado"}
+		repo := &rutaRepoMock{
+			actualizarRutaFunc: func(id uint, d models.Ruta) (models.Ruta, bool) {
+				assert.Equal(t, uint(7), id)
+				d.ID = id
+				return d, true
+			},
+		}
+		svc := NewRutasService(repo)
+
+		resultado, err := svc.ActualizarRuta(7, datos)
+
+		require.NoError(t, err)
+		assert.EqualValues(t, 7, resultado.ID)
+		assert.Equal(t, "Ruta Norte", resultado.Nombre)
+	})
+}
+
+func TestRutasService_BorrarRuta(t *testing.T) {
+	t.Run("ruta inexistente → ErrRutaNoEncontrada", func(t *testing.T) {
+		repo := &rutaRepoMock{borrarRutaFunc: func(id uint) bool { return false }}
+		svc := NewRutasService(repo)
+
+		err := svc.BorrarRuta(1)
+
+		require.ErrorIs(t, err, ErrRutaNoEncontrada)
+	})
+
+	t.Run("ruta existente → se borra sin error", func(t *testing.T) {
+		repo := &rutaRepoMock{borrarRutaFunc: func(id uint) bool {
+			assert.Equal(t, uint(3), id)
+			return true
+		}}
+		svc := NewRutasService(repo)
+
+		err := svc.BorrarRuta(3)
+
+		require.NoError(t, err)
+	})
+}
+
+// ═══════════════════════════ PUNTOS — nuevos tests ═══════════════════════
+
+func TestRutasService_ListarPuntos(t *testing.T) {
+	esperados := []models.Punto{{ID: 1, RutaID: 1, Nombre: "Muelle", Direccion: "Av. Principal"}}
+	repo := &rutaRepoMock{listarPuntosFunc: func() []models.Punto { return esperados }}
+	svc := NewRutasService(repo)
+
+	resultado := svc.ListarPuntos()
+
+	assert.Equal(t, esperados, resultado)
+}
+
+func TestRutasService_ObtenerPunto(t *testing.T) {
+	t.Run("punto existente → lo devuelve sin error", func(t *testing.T) {
+		esperado := models.Punto{ID: 2, RutaID: 1, Nombre: "Muelle", Direccion: "Av. Principal"}
+		repo := &rutaRepoMock{
+			buscarPuntoPorIDFunc: func(id uint) (models.Punto, bool) { return esperado, true },
+		}
+		svc := NewRutasService(repo)
+
+		resultado, err := svc.ObtenerPunto(2)
+
+		require.NoError(t, err)
+		assert.Equal(t, esperado, resultado)
+	})
+
+	t.Run("punto inexistente → ErrPuntoNoEncontrado", func(t *testing.T) {
+		repo := &rutaRepoMock{
+			buscarPuntoPorIDFunc: func(id uint) (models.Punto, bool) { return models.Punto{}, false },
+		}
+		svc := NewRutasService(repo)
+
+		_, err := svc.ObtenerPunto(999)
+
+		require.ErrorIs(t, err, ErrPuntoNoEncontrado)
+	})
+}
+
+func TestRutasService_CrearPunto(t *testing.T) {
+	casos := []struct {
+		nombre    string
+		entrada   models.Punto
+		esperaErr error
+	}{
+		{
+			nombre:    "RutaID vacío → rechazado",
+			entrada:   models.Punto{RutaID: 0, Nombre: "Muelle", Direccion: "Av. Principal"},
+			esperaErr: ErrRutaIDVacio,
+		},
+		{
+			nombre:    "nombre vacío → rechazado",
+			entrada:   models.Punto{RutaID: 1, Nombre: "", Direccion: "Av. Principal"},
+			esperaErr: ErrNombreVacio,
+		},
+		{
+			nombre:    "dirección vacía → rechazado",
+			entrada:   models.Punto{RutaID: 1, Nombre: "Muelle", Direccion: ""},
+			esperaErr: ErrDireccionVacia,
+		},
+		{
+			nombre:    "punto válido → persiste con estado activo",
+			entrada:   models.Punto{RutaID: 1, Nombre: "Muelle", Direccion: "Av. Principal"},
+			esperaErr: nil,
+		},
+	}
+
+	for _, c := range casos {
+		t.Run(c.nombre, func(t *testing.T) {
+			repo := &rutaRepoMock{}
+			svc := NewRutasService(repo)
+
+			resultado, err := svc.CrearPunto(c.entrada)
+
+			if c.esperaErr != nil {
+				require.ErrorIs(t, err, c.esperaErr)
+				assert.False(t, repo.llamaronPunto, "el repositorio fue llamado aunque la validación debería haber fallado primero")
+			} else {
+				require.NoError(t, err)
+				assert.True(t, repo.llamaronPunto, "el repositorio nunca fue invocado para guardar el punto")
+				assert.Equal(t, "activo", resultado.Estado)
+			}
+		})
+	}
+}
+
+func TestRutasService_ActualizarPunto(t *testing.T) {
+	t.Run("datos inválidos → no llega a tocar el repo", func(t *testing.T) {
+		repo := &rutaRepoMock{
+			actualizarPuntoFunc: func(id uint, d models.Punto) (models.Punto, bool) {
+				t.Fatal("no debía llamarse a ActualizarPunto con datos inválidos")
+				return models.Punto{}, false
+			},
+		}
+		svc := NewRutasService(repo)
+
+		_, err := svc.ActualizarPunto(1, models.Punto{RutaID: 0, Nombre: "Muelle", Direccion: "Av."})
+
+		require.ErrorIs(t, err, ErrRutaIDVacio)
+	})
+
+	t.Run("punto inexistente → ErrPuntoNoEncontrado", func(t *testing.T) {
+		repo := &rutaRepoMock{
+			actualizarPuntoFunc: func(id uint, d models.Punto) (models.Punto, bool) { return models.Punto{}, false },
+		}
+		svc := NewRutasService(repo)
+
+		_, err := svc.ActualizarPunto(1, models.Punto{RutaID: 1, Nombre: "Muelle", Direccion: "Av."})
+
+		require.ErrorIs(t, err, ErrPuntoNoEncontrado)
+	})
+
+	t.Run("datos válidos → actualiza correctamente", func(t *testing.T) {
+		repo := &rutaRepoMock{
+			actualizarPuntoFunc: func(id uint, d models.Punto) (models.Punto, bool) {
+				d.ID = id
+				return d, true
+			},
+		}
+		svc := NewRutasService(repo)
+
+		resultado, err := svc.ActualizarPunto(9, models.Punto{RutaID: 1, Nombre: "Muelle", Direccion: "Av."})
+
+		require.NoError(t, err)
+		assert.EqualValues(t, 9, resultado.ID)
+	})
+}
+
+func TestRutasService_BorrarPunto(t *testing.T) {
+	t.Run("punto inexistente → ErrPuntoNoEncontrado", func(t *testing.T) {
+		repo := &rutaRepoMock{borrarPuntoFunc: func(id uint) bool { return false }}
+		svc := NewRutasService(repo)
+
+		err := svc.BorrarPunto(1)
+
+		require.ErrorIs(t, err, ErrPuntoNoEncontrado)
+	})
+
+	t.Run("punto existente → se borra sin error", func(t *testing.T) {
+		repo := &rutaRepoMock{borrarPuntoFunc: func(id uint) bool { return true }}
+		svc := NewRutasService(repo)
+
+		err := svc.BorrarPunto(1)
+
+		require.NoError(t, err)
+	})
+}
+
+// ═══════════════════════ TRANSPORTISTAS — nuevos tests ═══════════════════
+
+func TestRutasService_ListarTransportistas(t *testing.T) {
+	esperados := []models.Transportista{{ID: 1, Nombre: "Carlos", Telefono: "099", PlacaVehiculo: "ABC-123"}}
+	repo := &rutaRepoMock{listarTransportistasFunc: func() []models.Transportista { return esperados }}
+	svc := NewRutasService(repo)
+
+	resultado := svc.ListarTransportistas()
+
+	assert.Equal(t, esperados, resultado)
+}
+
+func TestRutasService_ObtenerTransportista(t *testing.T) {
+	t.Run("transportista existente → lo devuelve sin error", func(t *testing.T) {
+		esperado := models.Transportista{ID: 4, Nombre: "Carlos", Telefono: "099", PlacaVehiculo: "ABC-123"}
+		repo := &rutaRepoMock{
+			buscarTransportistaPorIDFunc: func(id uint) (models.Transportista, bool) { return esperado, true },
+		}
+		svc := NewRutasService(repo)
+
+		resultado, err := svc.ObtenerTransportista(4)
+
+		require.NoError(t, err)
+		assert.Equal(t, esperado, resultado)
+	})
+
+	t.Run("transportista inexistente → ErrTransportistaNoEncontrado", func(t *testing.T) {
+		repo := &rutaRepoMock{
+			buscarTransportistaPorIDFunc: func(id uint) (models.Transportista, bool) {
+				return models.Transportista{}, false
+			},
+		}
+		svc := NewRutasService(repo)
+
+		_, err := svc.ObtenerTransportista(999)
+
+		require.ErrorIs(t, err, ErrTransportistaNoEncontrado)
+	})
+}
+
+func TestRutasService_CrearTransportista_PlacaDuplicada(t *testing.T) {
+	repo := &rutaRepoMock{
+		listarTransportistasFunc: func() []models.Transportista {
+			return []models.Transportista{{ID: 1, PlacaVehiculo: "ABC-123"}}
+		},
+	}
+	svc := NewRutasService(repo)
+
+	_, err := svc.CrearTransportista(models.Transportista{Nombre: "Carlos", Telefono: "099", PlacaVehiculo: "ABC-123"})
+
+	require.ErrorIs(t, err, ErrPlacaDuplicada)
+	assert.False(t, repo.llamaronTransportista, "no debía guardarse un transportista con placa duplicada")
+}
+
+func TestRutasService_ActualizarTransportista(t *testing.T) {
+	t.Run("datos inválidos → no llega a tocar el repo", func(t *testing.T) {
+		repo := &rutaRepoMock{
+			actualizarTransportistaFunc: func(id uint, d models.Transportista) (models.Transportista, bool) {
+				t.Fatal("no debía llamarse a ActualizarTransportista con datos inválidos")
+				return models.Transportista{}, false
+			},
+		}
+		svc := NewRutasService(repo)
+
+		_, err := svc.ActualizarTransportista(1, models.Transportista{Nombre: "", Telefono: "099", PlacaVehiculo: "ABC-123"})
+
+		require.ErrorIs(t, err, ErrNombreVacio)
+	})
+
+	t.Run("placa duplicada (de otro transportista) → ErrPlacaDuplicada", func(t *testing.T) {
+		repo := &rutaRepoMock{
+			listarTransportistasFunc: func() []models.Transportista {
+				return []models.Transportista{{ID: 2, PlacaVehiculo: "XYZ-999"}}
+			},
+		}
+		svc := NewRutasService(repo)
+
+		_, err := svc.ActualizarTransportista(1, models.Transportista{Nombre: "Carlos", Telefono: "099", PlacaVehiculo: "XYZ-999"})
+
+		require.ErrorIs(t, err, ErrPlacaDuplicada)
+	})
+
+	t.Run("placa repetida pero es la del mismo transportista → se permite", func(t *testing.T) {
+		repo := &rutaRepoMock{
+			listarTransportistasFunc: func() []models.Transportista {
+				return []models.Transportista{{ID: 1, PlacaVehiculo: "XYZ-999"}}
+			},
+			actualizarTransportistaFunc: func(id uint, d models.Transportista) (models.Transportista, bool) {
+				d.ID = id
+				return d, true
+			},
+		}
+		svc := NewRutasService(repo)
+
+		resultado, err := svc.ActualizarTransportista(1, models.Transportista{Nombre: "Carlos", Telefono: "099", PlacaVehiculo: "XYZ-999"})
+
+		require.NoError(t, err)
+		assert.EqualValues(t, 1, resultado.ID)
+	})
+
+	t.Run("transportista inexistente → ErrTransportistaNoEncontrado", func(t *testing.T) {
+		repo := &rutaRepoMock{
+			actualizarTransportistaFunc: func(id uint, d models.Transportista) (models.Transportista, bool) {
+				return models.Transportista{}, false
+			},
+		}
+		svc := NewRutasService(repo)
+
+		_, err := svc.ActualizarTransportista(1, models.Transportista{Nombre: "Carlos", Telefono: "099", PlacaVehiculo: "ABC-123"})
+
+		require.ErrorIs(t, err, ErrTransportistaNoEncontrado)
+	})
+}
+
+func TestRutasService_BorrarTransportista(t *testing.T) {
+	t.Run("transportista inexistente → ErrTransportistaNoEncontrado", func(t *testing.T) {
+		repo := &rutaRepoMock{borrarTransportistaFunc: func(id uint) bool { return false }}
+		svc := NewRutasService(repo)
+
+		err := svc.BorrarTransportista(1)
+
+		require.ErrorIs(t, err, ErrTransportistaNoEncontrado)
+	})
+
+	t.Run("transportista existente → se borra sin error", func(t *testing.T) {
+		repo := &rutaRepoMock{borrarTransportistaFunc: func(id uint) bool { return true }}
+		svc := NewRutasService(repo)
+
+		err := svc.BorrarTransportista(1)
+
+		require.NoError(t, err)
+	})
+}
+
+func TestRutasService_placaYaExiste(t *testing.T) {
+	repo := &rutaRepoMock{
+		listarTransportistasFunc: func() []models.Transportista {
+			return []models.Transportista{
+				{ID: 1, PlacaVehiculo: "ABC-123"},
+				{ID: 2, PlacaVehiculo: "XYZ-999"},
+			}
+		},
+	}
+	svc := NewRutasService(repo)
+
+	assert.True(t, svc.placaYaExiste("ABC-123", 0), "la placa existe y debería detectarse")
+	assert.False(t, svc.placaYaExiste("ABC-123", 1), "la placa es del mismo ID que se está ignorando")
+	assert.False(t, svc.placaYaExiste("NUEVA-000", 0), "la placa no existe en la lista")
+}
+
+// ═══════════════════════════ ENTREGAS — nuevos tests ═════════════════════
+
+func TestRutasService_ListarEntregas(t *testing.T) {
+	esperadas := []models.EntregaPedido{{ID: 1, PedidoID: 1, PuntoID: 1, TransportistaID: 1}}
+	repo := &rutaRepoMock{listarEntregasFunc: func() []models.EntregaPedido { return esperadas }}
+	svc := NewRutasService(repo)
+
+	resultado := svc.ListarEntregas()
+
+	assert.Equal(t, esperadas, resultado)
+}
+
+func TestRutasService_ObtenerEntrega(t *testing.T) {
+	t.Run("entrega existente → la devuelve sin error", func(t *testing.T) {
+		esperada := models.EntregaPedido{ID: 6, PedidoID: 1, PuntoID: 1, TransportistaID: 1}
+		repo := &rutaRepoMock{
+			buscarEntregaPorIDFunc: func(id uint) (models.EntregaPedido, bool) { return esperada, true },
+		}
+		svc := NewRutasService(repo)
+
+		resultado, err := svc.ObtenerEntrega(6)
+
+		require.NoError(t, err)
+		assert.Equal(t, esperada, resultado)
+	})
+
+	t.Run("entrega inexistente → ErrEntregaNoEncontrada", func(t *testing.T) {
+		repo := &rutaRepoMock{
+			buscarEntregaPorIDFunc: func(id uint) (models.EntregaPedido, bool) {
+				return models.EntregaPedido{}, false
+			},
+		}
+		svc := NewRutasService(repo)
+
+		_, err := svc.ObtenerEntrega(999)
+
+		require.ErrorIs(t, err, ErrEntregaNoEncontrada)
+	})
+}
+
+func TestRutasService_CrearEntrega(t *testing.T) {
+	casos := []struct {
+		nombre    string
+		entrada   models.EntregaPedido
+		esperaErr error
+	}{
+		{
+			nombre:    "PedidoID vacío → rechazado",
+			entrada:   models.EntregaPedido{PedidoID: 0, PuntoID: 1, TransportistaID: 1},
+			esperaErr: ErrPedidoIDVacio,
+		},
+		{
+			nombre:    "PuntoID vacío → rechazado",
+			entrada:   models.EntregaPedido{PedidoID: 1, PuntoID: 0, TransportistaID: 1},
+			esperaErr: ErrPuntoIDVacio,
+		},
+		{
+			nombre:    "TransportistaID vacío → rechazado",
+			entrada:   models.EntregaPedido{PedidoID: 1, PuntoID: 1, TransportistaID: 0},
+			esperaErr: ErrTransportistaIDVacio,
+		},
+		{
+			nombre:    "entrega válida → persiste con estado pendiente",
+			entrada:   models.EntregaPedido{PedidoID: 1, PuntoID: 1, TransportistaID: 1},
+			esperaErr: nil,
+		},
+	}
+
+	for _, c := range casos {
+		t.Run(c.nombre, func(t *testing.T) {
+			repo := &rutaRepoMock{}
+			svc := NewRutasService(repo)
+
+			resultado, err := svc.CrearEntrega(c.entrada)
+
+			if c.esperaErr != nil {
+				require.ErrorIs(t, err, c.esperaErr)
+				assert.False(t, repo.llamaronEntrega, "el repositorio fue llamado aunque la validación debería haber fallado primero")
+			} else {
+				require.NoError(t, err)
+				assert.True(t, repo.llamaronEntrega, "el repositorio nunca fue invocado para guardar la entrega")
+				assert.Equal(t, "pendiente", resultado.Estado, "esperaba Estado=pendiente en la entrega creada")
+			}
+		})
+	}
+}
+
+func TestRutasService_ActualizarEntrega(t *testing.T) {
+	t.Run("datos inválidos → no llega a tocar el repo", func(t *testing.T) {
+		repo := &rutaRepoMock{
+			actualizarEntregaFunc: func(id uint, d models.EntregaPedido) (models.EntregaPedido, bool) {
+				t.Fatal("no debía llamarse a ActualizarEntrega con datos inválidos")
+				return models.EntregaPedido{}, false
+			},
+		}
+		svc := NewRutasService(repo)
+
+		_, err := svc.ActualizarEntrega(1, models.EntregaPedido{PedidoID: 0, PuntoID: 1, TransportistaID: 1})
+
+		require.ErrorIs(t, err, ErrPedidoIDVacio)
+	})
+
+	t.Run("entrega inexistente → ErrEntregaNoEncontrada", func(t *testing.T) {
+		repo := &rutaRepoMock{
+			actualizarEntregaFunc: func(id uint, d models.EntregaPedido) (models.EntregaPedido, bool) {
+				return models.EntregaPedido{}, false
+			},
+		}
+		svc := NewRutasService(repo)
+
+		_, err := svc.ActualizarEntrega(1, models.EntregaPedido{PedidoID: 1, PuntoID: 1, TransportistaID: 1})
+
+		require.ErrorIs(t, err, ErrEntregaNoEncontrada)
+	})
+
+	t.Run("datos válidos → actualiza correctamente", func(t *testing.T) {
+		repo := &rutaRepoMock{
+			actualizarEntregaFunc: func(id uint, d models.EntregaPedido) (models.EntregaPedido, bool) {
+				d.ID = id
+				return d, true
+			},
+		}
+		svc := NewRutasService(repo)
+
+		resultado, err := svc.ActualizarEntrega(8, models.EntregaPedido{PedidoID: 1, PuntoID: 1, TransportistaID: 1})
+
+		require.NoError(t, err)
+		assert.EqualValues(t, 8, resultado.ID)
+	})
+}
+
+func TestRutasService_BorrarEntrega(t *testing.T) {
+	t.Run("entrega inexistente → ErrEntregaNoEncontrada", func(t *testing.T) {
+		repo := &rutaRepoMock{borrarEntregaFunc: func(id uint) bool { return false }}
+		svc := NewRutasService(repo)
+
+		err := svc.BorrarEntrega(1)
+
+		require.ErrorIs(t, err, ErrEntregaNoEncontrada)
+	})
+
+	t.Run("entrega existente → se borra sin error", func(t *testing.T) {
+		repo := &rutaRepoMock{borrarEntregaFunc: func(id uint) bool { return true }}
+		svc := NewRutasService(repo)
+
+		err := svc.BorrarEntrega(1)
+
+		require.NoError(t, err)
+	})
 }
