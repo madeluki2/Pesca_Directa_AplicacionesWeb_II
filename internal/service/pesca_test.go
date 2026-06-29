@@ -489,8 +489,6 @@ func TestPescaService_ObtenerStock_Inexistente(t *testing.T) {
 	require.ErrorIs(t, err, ErrStockNoEncontrado)
 }
 
-// ═══════════════════════════ LISTAR (los que faltan en 0%) ═══════════════════
-
 func TestPescaService_ListarEspecies(t *testing.T) {
 	mock := nuevoMock()
 	svc := NewPescaService(mock)
@@ -532,8 +530,6 @@ func TestPescaService_ListarStocks(t *testing.T) {
 	mock.CrearStock(models.Stock{BodegaID: 1, EspecieID: 1, CantidadKG: 50, FechaIngreso: "2026-06-28", Estado: true})
 	assert.Len(t, svc.ListarStocks(), 1)
 }
-
-// ═══════════════════════════ ACTUALIZAR (los que faltan) ═════════════════════
 
 func TestPescaService_ActualizarPescador(t *testing.T) {
 	mock := nuevoMock()
