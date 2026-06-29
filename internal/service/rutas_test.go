@@ -29,9 +29,18 @@ func (m *rutaRepoMock) CrearTransportista(t models.Transportista) models.Transpo
 	return t
 }
 
-func (m *rutaRepoMock) ListarRutas() []models.Ruta                                   { return nil }
-func (m *rutaRepoMock) BuscarRutaPorID(id uint) (models.Ruta, bool)                  { return models.Ruta{}, false }
-func (m *rutaRepoMock) ActualizarRuta(id uint, d models.Ruta) (models.Ruta, bool)    { return d, true }
+func (m *rutaRepoMock) ListarRutas() []models.Ruta {
+	return nil
+}
+
+func (m *rutaRepoMock) BuscarRutaPorID(id uint) (models.Ruta, bool) {
+	return models.Ruta{}, false
+}
+
+func (m *rutaRepoMock) ActualizarRuta(id uint, d models.Ruta) (models.Ruta, bool) {
+	return d, true
+}
+
 func (m *rutaRepoMock) BorrarRuta(id uint) bool                                      { return true }
 func (m *rutaRepoMock) ListarPuntos() []models.Punto                                 { return nil }
 func (m *rutaRepoMock) BuscarPuntoPorID(id uint) (models.Punto, bool)                { return models.Punto{}, false }
