@@ -12,15 +12,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/glebarez/sqlite"
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
-	"gorm.io/gorm"
 
 	"Pesca_Directa_AplicacionesWeb_II/internal/config"
 	"Pesca_Directa_AplicacionesWeb_II/internal/handlers"
 	"Pesca_Directa_AplicacionesWeb_II/internal/middleware"
-	"Pesca_Directa_AplicacionesWeb_II/internal/models"
 	"Pesca_Directa_AplicacionesWeb_II/internal/service"
 	"Pesca_Directa_AplicacionesWeb_II/internal/storage"
 )
@@ -42,62 +39,35 @@ func main() {
 // Separar run() de main() facilita los tests de integración del servidor.
 func run(cfg config.Config) error {
 
-	// ── 1. GORM: dueño del esquema ───────────────────────────────────────
-	gdb, err := gorm.Open(sqlite.Open(cfg.RutaDB), &gorm.Config{})
+	// ── 1. LEER VARIABLES DE ENTORNO PARA INFRAESTRUCTURA ────────────────
+	// El driver define si usamos "postgres" (Docker) o "sqlite" (Local)
+	driver := os.Getenv("DB_DRIVER")
+	if driver == "" {
+		driver = "sqlite" // Por defecto si se ejecuta fuera de Docker
+	}
+	dsn := os.Getenv("DB_DSN") // String de conexión a PostgreSQL provisto por Docker
+
+	// ── 2. DELEGAR AL FACTORY (INICIALIZAR ALMACENAMIENTO) ───────────────
+	// Centraliza: Apertura de conexión, AutoMigrate de todos los modelos y siembra.
+	recursos, err := storage.Inicializar(driver, dsn, cfg.RutaDB, cfg.Storage)
 	if err != nil {
-		return fmt.Errorf("no se pudo abrir la base de datos: %w", err)
+		return fmt.Errorf("error inicializando el almacenamiento: %w", err)
 	}
-	if err := gdb.AutoMigrate(
-		&models.Usuario{},
-		&models.Pescador{},
-		&models.Embarcacion{},
-		&models.Especie{},
-		&models.Captura{},
-		&models.Bodega{},
-		&models.Stock{},
-		&models.Cliente{},
-		&models.Pedido{},
-		&models.DetallePedido{},
-		&models.Ruta{},
-		&models.Punto{},
-		&models.Transportista{},
-		&models.EntregaPedido{},
-	); err != nil {
-		return fmt.Errorf("falló AutoMigrate: %w", err)
-	}
+	defer recursos.Cerrar() // Garantiza el cierre ordenado de conexiones al apagar la API
 
-	// ── 2. Elegir backend según cfg.Storage ──────────────────────────────
-	var almacenPesca storage.AlmacenPesca
-	var almacenPedidos storage.Almacen
-	var almacenRutas storage.AlmacenRutas
+	log.Printf("Infraestructura de Datos inicializada: %s", recursos.BackendUsado)
 
-	switch cfg.Storage {
-	case "memoria":
-		almacenPesca = storage.NuevaMemoriaPesca()
-		m := storage.NewMemoria()
-		m.Seed()
-		almacenPedidos = m
-		almacenRutas = storage.NuevaMemoriaRutas()
-		log.Println("Backend: Memoria (datos volátiles)")
-	default:
-		almacenPesca = storage.NuevoAlmacenSQLitePesca(gdb)
-		almacenPedidos = storage.NuevoAlmacenSQLite(gdb)
-		almacenRutas = storage.NuevoAlmacenSQLiteRutas(gdb)
-		log.Println("Backend: GORM + SQLite (", cfg.RutaDB, ")")
-	}
-
-	// ── 3. Services con configuración inyectada ──────────────────────────
-	// El secreto JWT y la duración vienen del .env, no están hardcodeados.
-	usuarioRepo := storage.NewUsuarioGORM(gdb)
-	authService := service.NewAuthService(usuarioRepo,
+	// ── 3. SERVICES CON CONFIGURACIÓN E INYECCIÓN DESDE RECURSOS ─────────
+	// El secreto JWT y la duración vienen del .env, las dependencias vienen de la fábrica.
+	authService := service.NewAuthService(recursos.Usuarios,
 		service.WithSecreto(cfg.JWTSecreto),
 		service.WithDuracionToken(cfg.JWTDuracion),
 	)
-	pescaService := service.NewPescaService(almacenPesca)
-	pedidoService := service.NewPedidoService(almacenPedidos)
-	rutasService := service.NewRutasService(almacenRutas)
+	pescaService := service.NewPescaService(recursos.Pesca)
+	pedidoService := service.NewPedidoService(recursos.Pedidos)
+	rutasService := service.NewRutasService(recursos.Rutas)
 
-	// ── 4. Server con Deps struct ────────────────────────────────────────
+	// ── 4. SERVER CON DEPS STRUCT ────────────────────────────────────────
 	servidor := handlers.NewServer(handlers.Deps{
 		Pesca:   pescaService,
 		Pedidos: pedidoService,
@@ -105,13 +75,13 @@ func run(cfg config.Config) error {
 		Auth:    authService,
 	})
 
-	// ── 5. Router + middlewares ──────────────────────────────────────────
+	// ── 5. ROUTER + MIDDLEWARES ──────────────────────────────────────────
 	r := chi.NewRouter()
 	r.Use(chimw.Logger)
 	r.Use(chimw.Recoverer)
 	r.Use(middleware.CORS)
 
-	// ── 6. Rutas ─────────────────────────────────────────────────────────
+	// ── 6. RUTAS ─────────────────────────────────────────────────────────
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Post("/auth/register", servidor.Registrar)
 		r.Post("/auth/login", servidor.Login)
@@ -203,7 +173,7 @@ func run(cfg config.Config) error {
 		})
 	})
 
-	// ── 7. Servidor HTTP con timeouts y graceful shutdown ────────────────
+	// ── 7. SERVIDOR HTTP CON TIMEOUTS Y GRACEFUL SHUTDOWN ────────────────
 	srv := &http.Server{
 		Addr:         ":" + cfg.Puerto,
 		Handler:      r,
