@@ -2,15 +2,22 @@
 package main
 
 import (
+	"context"
+	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/glebarez/sqlite"
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
 	"gorm.io/gorm"
 
+	"Pesca_Directa_AplicacionesWeb_II/internal/config"
 	"Pesca_Directa_AplicacionesWeb_II/internal/handlers"
 	"Pesca_Directa_AplicacionesWeb_II/internal/middleware"
 	"Pesca_Directa_AplicacionesWeb_II/internal/models"
@@ -19,10 +26,26 @@ import (
 )
 
 func main() {
-	// ── 1. GORM: dueño del esquema ───────────────────────────────────────
-	gdb, err := gorm.Open(sqlite.Open("pesca.db"), &gorm.Config{})
+	// main.go solo hace dos cosas: cargar la config y llamar a run().
+	// run() devuelve error en vez de llamar log.Fatal en cada paso.
+	cfg, err := config.Cargar()
 	if err != nil {
-		log.Fatal("no se pudo abrir la base de datos: ", err)
+		log.Fatal("error cargando configuración: ", err)
+	}
+
+	if err := run(cfg); err != nil {
+		log.Fatal(err)
+	}
+}
+
+// run contiene toda la lógica de arranque.
+// Separar run() de main() facilita los tests de integración del servidor.
+func run(cfg config.Config) error {
+
+	// ── 1. GORM: dueño del esquema ───────────────────────────────────────
+	gdb, err := gorm.Open(sqlite.Open(cfg.RutaDB), &gorm.Config{})
+	if err != nil {
+		return fmt.Errorf("no se pudo abrir la base de datos: %w", err)
 	}
 	if err := gdb.AutoMigrate(
 		&models.Usuario{},
@@ -40,59 +63,63 @@ func main() {
 		&models.Transportista{},
 		&models.EntregaPedido{},
 	); err != nil {
-		log.Fatal("falló AutoMigrate: ", err)
+		return fmt.Errorf("falló AutoMigrate: %w", err)
 	}
 
-	// ── 2. Elegir el backend según la variable STORAGE ───────────────────
+	// ── 2. Elegir backend según cfg.Storage ──────────────────────────────
 	var almacenPesca storage.AlmacenPesca
 	var almacenPedidos storage.Almacen
 	var almacenRutas storage.AlmacenRutas
 
-	switch os.Getenv("STORAGE") {
+	switch cfg.Storage {
 	case "memoria":
 		almacenPesca = storage.NuevaMemoriaPesca()
 		m := storage.NewMemoria()
 		m.Seed()
 		almacenPedidos = m
-		almacenRutas = storage.NuevoAlmacenSQLiteRutas(gdb)
-		log.Println("Backend de almacenamiento: Memoria (datos volátiles)")
+		almacenRutas = storage.NuevaMemoriaRutas()
+		log.Println("Backend: Memoria (datos volátiles)")
 	default:
 		almacenPesca = storage.NuevoAlmacenSQLitePesca(gdb)
 		almacenPedidos = storage.NuevoAlmacenSQLite(gdb)
 		almacenRutas = storage.NuevoAlmacenSQLiteRutas(gdb)
-		log.Println("Backend de almacenamiento: GORM + SQLite (pesca.db)")
+		log.Println("Backend: GORM + SQLite (", cfg.RutaDB, ")")
 	}
 
-	// ── 3. UserRepository: siempre GORM ─────────────────────────────────
+	// ── 3. Services con configuración inyectada ──────────────────────────
+	// El secreto JWT y la duración vienen del .env, no están hardcodeados.
 	usuarioRepo := storage.NewUsuarioGORM(gdb)
-
-	// ── 4. Services con inyección de dependencias ────────────────────────
-	authService := service.NewAuthService(usuarioRepo)
+	authService := service.NewAuthService(usuarioRepo,
+		service.WithSecreto(cfg.JWTSecreto),
+		service.WithDuracionToken(cfg.JWTDuracion),
+	)
 	pescaService := service.NewPescaService(almacenPesca)
 	pedidoService := service.NewPedidoService(almacenPedidos)
 	rutasService := service.NewRutasService(almacenRutas)
 
-	// ── 5. Server: punto único de entrada para los handlers ──────────────
-	servidor := handlers.NewServer(pescaService, pedidoService, rutasService, authService)
+	// ── 4. Server con Deps struct ────────────────────────────────────────
+	servidor := handlers.NewServer(handlers.Deps{
+		Pesca:   pescaService,
+		Pedidos: pedidoService,
+		Rutas:   rutasService,
+		Auth:    authService,
+	})
 
-	// ── 6. Router + middlewares globales ─────────────────────────────────
+	// ── 5. Router + middlewares ──────────────────────────────────────────
 	r := chi.NewRouter()
 	r.Use(chimw.Logger)
 	r.Use(chimw.Recoverer)
 	r.Use(middleware.CORS)
 
-	// ── 7. Rutas versionadas /api/v1/ ────────────────────────────────────
+	// ── 6. Rutas ─────────────────────────────────────────────────────────
 	r.Route("/api/v1", func(r chi.Router) {
-
-		// Públicas — sin token
 		r.Post("/auth/register", servidor.Registrar)
 		r.Post("/auth/login", servidor.Login)
 
-		// Protegidas — requieren: Authorization: Bearer <token>
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.Auth(authService))
 
-			// ── Anthony: Gestión de Pesca ─────────────────────────────
+			// Anthony — Gestión de Pesca
 			r.Get("/pescadores", servidor.ListarPescadores)
 			r.Post("/pescadores", servidor.CrearPescador)
 			r.Get("/pescadores/{id}", servidor.ObtenerPescador)
@@ -129,7 +156,7 @@ func main() {
 			r.Put("/stocks/{id}", servidor.ActualizarStock)
 			r.Delete("/stocks/{id}", servidor.BorrarStock)
 
-			// ── Ilaria: Gestión de Pedidos ────────────────────────────
+			// Ilaria — Gestión de Pedidos
 			r.Get("/clientes", servidor.ListarClientes)
 			r.Post("/clientes", servidor.CrearCliente)
 			r.Get("/clientes/{id}", servidor.ObtenerCliente)
@@ -149,7 +176,7 @@ func main() {
 			r.Put("/detalles-pedido/{id}", servidor.ActualizarDetalle)
 			r.Delete("/detalles-pedido/{id}", servidor.EliminarDetalle)
 
-			// ── Madelyn: Rutas de Distribución ────────────────────────
+			// Madelyn — Rutas de Distribución
 			r.Get("/rutas", servidor.ListarRutas)
 			r.Post("/rutas", servidor.CrearRuta)
 			r.Get("/rutas/{id}", servidor.ObtenerRuta)
@@ -176,6 +203,39 @@ func main() {
 		})
 	})
 
-	log.Println("Servidor Pesca-Directa Tarqui escuchando en http://localhost:8080")
-	log.Fatal(http.ListenAndServe(":8080", r))
+	// ── 7. Servidor HTTP con timeouts y graceful shutdown ────────────────
+	srv := &http.Server{
+		Addr:         ":" + cfg.Puerto,
+		Handler:      r,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  120 * time.Second,
+	}
+
+	// Canal que escucha señales de sistema (Ctrl+C, kill)
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+
+	// Arrancar el servidor en una goroutine para poder escuchar la señal
+	go func() {
+		log.Println("Servidor Pesca-Directa Tarqui escuchando en http://localhost:" + cfg.Puerto)
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Printf("error del servidor: %v", err)
+		}
+	}()
+
+	// Bloquear hasta recibir señal de parada
+	<-stop
+	log.Println("Apagando servidor...")
+
+	// Dar 10 segundos para que terminen las requests en curso
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(ctx); err != nil {
+		return fmt.Errorf("error en shutdown: %w", err)
+	}
+
+	log.Println("Servidor detenido limpiamente.")
+	return nil
 }
