@@ -11,7 +11,7 @@ import (
 	"Pesca_Directa_AplicacionesWeb_II/internal/models"
 )
 
-func abrirDBEnMemoria(t *testing.T) *gorm.DB {
+func abrirDBEnMemoriaDañada(t *testing.T) *gorm.DB {
 	t.Helper()
 	gdb, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err, "no se pudo abrir SQLite en memoria")
