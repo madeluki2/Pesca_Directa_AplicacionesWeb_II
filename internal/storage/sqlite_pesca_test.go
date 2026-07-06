@@ -38,7 +38,7 @@ func TestRepositorio_CrearYListarEspecie(t *testing.T) {
 	require.NotZero(t, creada.ID, "GORM no asignó ID")
 	lista := repo.ListarEspecies()
 	require.Len(t, lista, 1)
-	assert.Equal(t, "Picudo", lista[0].NombreComun)
+	assert.Equal(t, "Atún", lista[0].NombreComun)
 }
 
 func TestRepositorio_BuscarEspeciePorID(t *testing.T) {
