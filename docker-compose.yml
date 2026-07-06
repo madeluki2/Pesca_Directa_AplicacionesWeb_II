@@ -1,0 +1,32 @@
+# ============================================================================
+# Pesca-Directa Tarqui — Docker Compose
+#
+# A diferencia del proyecto de cafetería (que usa PostgreSQL), este proyecto
+# usa SQLite. No necesitamos un contenedor de base de datos separado.
+# Solo tenemos UN servicio: la API.
+#
+# Los datos de pesca.db se guardan en un volumen nombrado para que
+# sobrevivan a "docker compose down" (sin el flag -v).
+# ============================================================================
+
+services:
+  api:
+    build: .                          # Usa el Dockerfile de este directorio
+    container_name: pesca-directa-api
+    environment:
+      PUERTO: "8080"
+      # SQLite guarda el archivo dentro del contenedor en /app/data/pesca.db.
+      # El volumen "dbdata" lo persiste fuera del contenedor.
+      RUTA_DB: "/app/data/pesca.db"
+      STORAGE: "gorm"
+      # IMPORTANTE: cambia este valor antes de usar en producción.
+      JWT_SECRETO: "cambia-esto-en-produccion-con-valor-largo-y-secreto"
+      JWT_DURACION: "24h"
+    ports:
+      - "8080:8080"                   # host:contenedor
+    volumes:
+      # Volumen nombrado: los datos de pesca.db sobreviven al contenedor.
+      - dbdata:/app/data
+
+volumes:
+  dbdata:

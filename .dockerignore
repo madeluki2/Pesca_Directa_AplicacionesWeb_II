@@ -1,0 +1,14 @@
+# Archivos que Docker NO debe copiar al construir la imagen.
+# Excluirlos hace el build más rápido y la imagen más limpia.
+
+.git
+.gitignore
+.env
+*.db
+*.db-journal
+pesca-api
+*.out
+coverage.html
+README.md
+Dockerfile
+docker-compose.yml
