@@ -1,17 +1,5 @@
 package handlers
 
-// Test 2 — Handler con httptest + fake en memoria.
-//
-// Qué comprueba:
-//   a) Ruta protegida SIN token → 401 Unauthorized.
-//   b) Token expirado → 401 Unauthorized.
-//   c) POST /especies con datos válidos y token → 201 Created.
-//   d) POST /especies con nombre_comun vacío → 400 Bad Request.
-//
-// Diferencia mock vs fake:
-//   Mock  → configuras exactamente qué devuelve cada llamada (para aislar).
-//   Fake  → implementación real simple en RAM; aquí SÍ se guardan datos.
-
 import (
 	"bytes"
 	"encoding/json"
@@ -32,8 +20,6 @@ import (
 )
 
 // ─── Fake de AlmacenPesca en memoria ─────────────────────────────────────────
-// A diferencia del mock, el fake SÍ guarda datos reales en RAM.
-// Permite verificar que lo que se crea luego se puede leer.
 
 type especieFake struct {
 	datos  []models.Especie
@@ -76,8 +62,6 @@ func (f *especieFake) BorrarEspecie(id int) bool {
 	}
 	return false
 }
-
-// Resto de AlmacenPesca — no usados en estos tests.
 func (f *especieFake) ListarPescadores() []models.Pescador { return nil }
 func (f *especieFake) BuscarPescadorPorID(id int) (models.Pescador, bool) {
 	return models.Pescador{}, false
@@ -160,7 +144,13 @@ func nuevoRouterTest(t *testing.T) (http.Handler, *service.AuthService) {
 	pedidoService := service.NewPedidoService(storage.NewMemoria())
 	rutasService := service.NewRutasService(storage.NuevaMemoriaRutas())
 
-	servidor := NewServer(pescaService, pedidoService, rutasService, authService)
+	// ← CAMBIO: Deps struct en vez de parámetros posicionales
+	servidor := NewServer(Deps{
+		Pesca:   pescaService,
+		Pedidos: pedidoService,
+		Rutas:   rutasService,
+		Auth:    authService,
+	})
 
 	r := chi.NewRouter()
 	r.Route("/api/v1", func(r chi.Router) {
@@ -181,52 +171,41 @@ func nuevoRouterTest(t *testing.T) (http.Handler, *service.AuthService) {
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 // Test 401 — GET /especies SIN token debe devolver 401.
-// Esto demuestra que el middleware.Auth protege la ruta correctamente.
 func TestHandler_GetEspecies_SinToken_Devuelve401(t *testing.T) {
-	// ── Preparar ──────────────────────────────────────────────────────────
 	router, _ := nuevoRouterTest(t)
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/especies", nil)
-	// ← sin header Authorization
 	rec := httptest.NewRecorder()
 
-	// ── Ejecutar ──────────────────────────────────────────────────────────
 	router.ServeHTTP(rec, req)
 
-	// ── Verificar ─────────────────────────────────────────────────────────
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
 }
 
 // Test 401 — Token expirado debe devolver 401.
 func TestHandler_TokenExpirado_Devuelve401(t *testing.T) {
-	// ── Preparar ──────────────────────────────────────────────────────────
 	router, _ := nuevoRouterTest(t)
 
-	// Usamos la misma clave secreta del servicio para firmar el token expirado.
-	// El test crea manualmente un token con ExpiresAt en el pasado.
-	secretJWTTest := []byte("pesca-directa-tarqui-secret-2026")
 	claims := &service.Claims{
 		UsuarioID: 1,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(-1 * time.Hour)), // ya expiró
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(-1 * time.Hour)),
 		},
 	}
-	tokenExpirado, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(secretJWTTest)
+	tokenExpirado, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).
+		SignedString([]byte(service.SecretoPorDefecto))
 	require.NoError(t, err)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/especies", nil)
 	req.Header.Set("Authorization", "Bearer "+tokenExpirado)
 	rec := httptest.NewRecorder()
 
-	// ── Ejecutar ──────────────────────────────────────────────────────────
 	router.ServeHTTP(rec, req)
 
-	// ── Verificar ─────────────────────────────────────────────────────────
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
 }
 
 // Test 201 — POST /especies con datos válidos y token → 201 Created.
 func TestHandler_CrearEspecie_Valida_Devuelve201(t *testing.T) {
-	// ── Preparar ──────────────────────────────────────────────────────────
 	router, auth := nuevoRouterTest(t)
 	token := generarTokenTest(t, auth)
 
@@ -241,26 +220,23 @@ func TestHandler_CrearEspecie_Valida_Devuelve201(t *testing.T) {
 	req.Header.Set("Authorization", token)
 	rec := httptest.NewRecorder()
 
-	// ── Ejecutar ──────────────────────────────────────────────────────────
 	router.ServeHTTP(rec, req)
 
-	// ── Verificar ─────────────────────────────────────────────────────────
 	require.Equal(t, http.StatusCreated, rec.Code, "body: %s", rec.Body.String())
 
 	var respuesta models.Especie
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &respuesta))
-	assert.NotZero(t, respuesta.ID, "la especie creada debe tener un ID asignado")
+	assert.NotZero(t, respuesta.ID)
 	assert.Equal(t, "Corvina", respuesta.NombreComun)
 }
 
 // Test 400 — POST /especies con nombre_comun vacío → 400 Bad Request.
 func TestHandler_CrearEspecie_NombreVacio_Devuelve400(t *testing.T) {
-	// ── Preparar ──────────────────────────────────────────────────────────
 	router, auth := nuevoRouterTest(t)
 	token := generarTokenTest(t, auth)
 
 	cuerpo, _ := json.Marshal(models.Especie{
-		NombreComun:  "", // ← campo requerido vacío
+		NombreComun:  "",
 		UnidadMedida: "kg",
 	})
 
@@ -269,9 +245,7 @@ func TestHandler_CrearEspecie_NombreVacio_Devuelve400(t *testing.T) {
 	req.Header.Set("Authorization", token)
 	rec := httptest.NewRecorder()
 
-	// ── Ejecutar ──────────────────────────────────────────────────────────
 	router.ServeHTTP(rec, req)
 
-	// ── Verificar ─────────────────────────────────────────────────────────
 	assert.Equal(t, http.StatusBadRequest, rec.Code, "body: %s", rec.Body.String())
 }
