@@ -1,32 +1,46 @@
 # ============================================================================
-# Pesca-Directa Tarqui — Docker Compose
-#
-# A diferencia del proyecto de cafetería (que usa PostgreSQL), este proyecto
-# usa SQLite. No necesitamos un contenedor de base de datos separado.
-# Solo tenemos UN servicio: la API.
-#
-# Los datos de pesca.db se guardan en un volumen nombrado para que
-# sobrevivan a "docker compose down" (sin el flag -v).
+# Pesca-Directa Tarqui — Docker Compose Mapeado a PostgreSQL
 # ============================================================================
 
 services:
   api:
-    build: .                          # Usa el Dockerfile de este directorio
+    build: .                           # Usa el Dockerfile de este directorio
     container_name: pesca-directa-api
     environment:
       PUERTO: "8080"
-      # SQLite guarda el archivo dentro del contenedor en /app/data/pesca.db.
-      # El volumen "dbdata" lo persiste fuera del contenedor.
-      RUTA_DB: "/app/data/pesca.db"
       STORAGE: "gorm"
-      # IMPORTANTE: cambia este valor antes de usar en producción.
+      # Variables de control para tu nueva fábrica (Factory)
+      DB_DRIVER: "postgres"
+      DB_DSN: "host=db user=pesca_user password=pesca_password dbname=pesca_tarqui_db port=5432 sslmode=disable TimeZone=America/Guayaquil"
+      RUTA_DB: "/app/data/pesca.db"    # Se mantiene por si cambias el driver a sqlite
+      # Tus variables de autenticación intactas
       JWT_SECRETO: "cambia-esto-en-produccion-con-valor-largo-y-secreto"
       JWT_DURACION: "24h"
     ports:
       - "8080:8080"                   # host:contenedor
     volumes:
-      # Volumen nombrado: los datos de pesca.db sobreviven al contenedor.
       - dbdata:/app/data
+    depends_on:
+      db:
+        condition: service_healthy     # Espera a que Postgres esté listo para recibir consultas
+
+  db:
+    image: postgres:16-alpine
+    container_name: pesca-postgres-db
+    environment:
+      POSTGRES_USER: pesca_user
+      POSTGRES_PASSWORD: pesca_password
+      POSTGRES_DB: pesca_tarqui_db
+    ports:
+      - "5432:5432"                    # Por si quieres conectar DBeaver o PgAdmin desde Windows
+    volumes:
+      - postgres_pesca_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pesca_user -d pesca_tarqui_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
 volumes:
   dbdata:
+  postgres_pesca_data:                 # Nuevo volumen nombrado para que tus datos de Postgres no se borren
