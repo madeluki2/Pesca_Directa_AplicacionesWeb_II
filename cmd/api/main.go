@@ -4,10 +4,8 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"os/signal"
 	"syscall"
 	"time"
@@ -23,51 +21,30 @@ import (
 )
 
 func main() {
-	// main.go solo hace dos cosas: cargar la config y llamar a run().
-	// run() devuelve error en vez de llamar log.Fatal en cada paso.
-	cfg, err := config.Cargar()
-	if err != nil {
-		log.Fatal("error cargando configuración: ", err)
-	}
-
+	cfg := config.Cargar()
 	if err := run(cfg); err != nil {
 		log.Fatal(err)
 	}
 }
 
-// run contiene toda la lógica de arranque.
-// Separar run() de main() facilita los tests de integración del servidor.
 func run(cfg config.Config) error {
-
-	// ── 1. LEER VARIABLES DE ENTORNO PARA INFRAESTRUCTURA ────────────────
-	// El driver define si usamos "postgres" (Docker) o "sqlite" (Local)
-	driver := os.Getenv("DB_DRIVER")
-	if driver == "" {
-		driver = "sqlite" // Por defecto si se ejecuta fuera de Docker
-	}
-	dsn := os.Getenv("DB_DSN") // String de conexión a PostgreSQL provisto por Docker
-
-	// ── 2. DELEGAR AL FACTORY (INICIALIZAR ALMACENAMIENTO) ───────────────
-	// Centraliza: Apertura de conexión, AutoMigrate de todos los modelos y siembra.
-	recursos, err := storage.Inicializar(driver, dsn, cfg.RutaDB, cfg.Storage)
+	// 1. Factory: abre BD, migra y elige backend.
+	recursos, err := storage.Inicializar(cfg.DBDriver, cfg.DBDsn, cfg.RutaDB, cfg.Backend)
 	if err != nil {
-		return fmt.Errorf("error inicializando el almacenamiento: %w", err)
+		return err
 	}
-	defer recursos.Cerrar() // Garantiza el cierre ordenado de conexiones al apagar la API
+	defer func() { _ = recursos.Cerrar() }()
+	log.Printf("Motor: %s | Backend: %s", cfg.DBDriver, recursos.BackendUsado)
 
-	log.Printf("Infraestructura de Datos inicializada: %s", recursos.BackendUsado)
-
-	// ── 3. SERVICES CON CONFIGURACIÓN E INYECCIÓN DESDE RECURSOS ─────────
-	// El secreto JWT y la duración vienen del .env, las dependencias vienen de la fábrica.
-	authService := service.NewAuthService(recursos.Usuarios,
-		service.WithSecreto(cfg.JWTSecreto),
-		service.WithDuracionToken(cfg.JWTDuracion),
-	)
+	// 2. Services — AuthService usa SecretJWT (var global actual).
+	//    Cuando se aplique el refactor de Options, esta línea cambia a:
+	//    service.NewAuthService(recursos.Usuarios, service.WithSecreto(cfg.JWTSecreto), ...)
+	authService := service.NewAuthService(recursos.Usuarios)
 	pescaService := service.NewPescaService(recursos.Pesca)
 	pedidoService := service.NewPedidoService(recursos.Pedidos)
 	rutasService := service.NewRutasService(recursos.Rutas)
 
-	// ── 4. SERVER CON DEPS STRUCT ────────────────────────────────────────
+	// 3. Server con Deps.
 	servidor := handlers.NewServer(handlers.Deps{
 		Pesca:   pescaService,
 		Pedidos: pedidoService,
@@ -75,13 +52,13 @@ func run(cfg config.Config) error {
 		Auth:    authService,
 	})
 
-	// ── 5. ROUTER + MIDDLEWARES ──────────────────────────────────────────
+	// 4. Router + middlewares.
 	r := chi.NewRouter()
 	r.Use(chimw.Logger)
 	r.Use(chimw.Recoverer)
 	r.Use(middleware.CORS)
 
-	// ── 6. RUTAS ─────────────────────────────────────────────────────────
+	// 5. Rutas /api/v1/.
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Post("/auth/register", servidor.Registrar)
 		r.Post("/auth/login", servidor.Login)
@@ -89,7 +66,7 @@ func run(cfg config.Config) error {
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.Auth(authService))
 
-			// Anthony — Gestión de Pesca
+			// ── Anthony: Gestión de Pesca ─────────────────────────────
 			r.Get("/pescadores", servidor.ListarPescadores)
 			r.Post("/pescadores", servidor.CrearPescador)
 			r.Get("/pescadores/{id}", servidor.ObtenerPescador)
@@ -126,7 +103,7 @@ func run(cfg config.Config) error {
 			r.Put("/stocks/{id}", servidor.ActualizarStock)
 			r.Delete("/stocks/{id}", servidor.BorrarStock)
 
-			// Ilaria — Gestión de Pedidos
+			// ── Ilaria: Gestión de Pedidos ────────────────────────────
 			r.Get("/clientes", servidor.ListarClientes)
 			r.Post("/clientes", servidor.CrearCliente)
 			r.Get("/clientes/{id}", servidor.ObtenerCliente)
@@ -146,7 +123,7 @@ func run(cfg config.Config) error {
 			r.Put("/detalles-pedido/{id}", servidor.ActualizarDetalle)
 			r.Delete("/detalles-pedido/{id}", servidor.EliminarDetalle)
 
-			// Madelyn — Rutas de Distribución
+			// ── Madelyn: Rutas de Distribución ────────────────────────
 			r.Get("/rutas", servidor.ListarRutas)
 			r.Post("/rutas", servidor.CrearRuta)
 			r.Get("/rutas/{id}", servidor.ObtenerRuta)
@@ -173,39 +150,41 @@ func run(cfg config.Config) error {
 		})
 	})
 
-	// ── 7. SERVIDOR HTTP CON TIMEOUTS Y GRACEFUL SHUTDOWN ────────────────
+	// 6. http.Server con timeouts desde config (sin paquete httpserver).
 	srv := &http.Server{
-		Addr:         ":" + cfg.Puerto,
+		Addr:         cfg.Puerto,
 		Handler:      r,
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 10 * time.Second,
-		IdleTimeout:  120 * time.Second,
+		ReadTimeout:  cfg.ReadTimeout,
+		WriteTimeout: cfg.WriteTimeout,
 	}
 
-	// Canal que escucha señales de sistema (Ctrl+C, kill)
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+	// 7. Contexto que se cancela con Ctrl+C / SIGTERM.
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
-	// Arrancar el servidor en una goroutine para poder escuchar la señal
+	// 8. Arrancar en goroutine.
+	errServidor := make(chan error, 1)
 	go func() {
-		log.Println("Servidor Pesca-Directa Tarqui escuchando en http://localhost:" + cfg.Puerto)
+		log.Printf("Servidor Pesca-Directa Tarqui escuchando en http://localhost%s", cfg.Puerto)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Printf("error del servidor: %v", err)
+			errServidor <- err
 		}
 	}()
 
-	// Bloquear hasta recibir señal de parada
-	<-stop
-	log.Println("Apagando servidor...")
-
-	// Dar 10 segundos para que terminen las requests en curso
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	if err := srv.Shutdown(ctx); err != nil {
-		return fmt.Errorf("error en shutdown: %w", err)
+	// 9. Esperar señal o error.
+	select {
+	case err := <-errServidor:
+		return err
+	case <-ctx.Done():
+		log.Println("Señal de apagado recibida, cerrando ordenadamente...")
 	}
 
+	// 10. Graceful shutdown: 10s para terminar requests en curso.
+	ctxApagado, cancelar := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancelar()
+	if err := srv.Shutdown(ctxApagado); err != nil {
+		return err
+	}
 	log.Println("Servidor detenido limpiamente.")
 	return nil
 }
