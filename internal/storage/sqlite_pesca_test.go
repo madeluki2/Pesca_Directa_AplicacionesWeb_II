@@ -29,6 +29,7 @@ func abrirDBEnMemoria(t *testing.T) *gorm.DB {
 
 // ═══════════════════════════ ESPECIES ════════════════════════════════════════
 
+// TEST 1: Crear y listar
 func TestRepositorio_CrearYListarEspecie(t *testing.T) {
 	repo := NuevoAlmacenSQLitePesca(abrirDBEnMemoria(t))
 	creada := repo.CrearEspecie(models.Especie{
@@ -41,6 +42,7 @@ func TestRepositorio_CrearYListarEspecie(t *testing.T) {
 	assert.Equal(t, "Atún", lista[0].NombreComun)
 }
 
+// TEST 2: Buscar por ID existente
 func TestRepositorio_BuscarEspeciePorID(t *testing.T) {
 	repo := NuevoAlmacenSQLitePesca(abrirDBEnMemoria(t))
 	guardada := repo.CrearEspecie(models.Especie{NombreComun: "Corvina", UnidadMedida: "kg", Estado: true})
@@ -49,11 +51,17 @@ func TestRepositorio_BuscarEspeciePorID(t *testing.T) {
 	encontrada, ok := repo.BuscarEspeciePorID(guardada.ID)
 	require.True(t, ok)
 	assert.Equal(t, "Corvina", encontrada.NombreComun)
-
-	_, ok = repo.BuscarEspeciePorID(9999)
-	assert.False(t, ok)
 }
 
+// TEST 3: Buscar ID que no existe (Caso Edge / Error Path)
+func TestRepositorio_BuscarEspecieNoExistente(t *testing.T) {
+	repo := NuevoAlmacenSQLitePesca(abrirDBEnMemoria(t))
+
+	_, ok := repo.BuscarEspeciePorID(9999)
+	assert.False(t, ok, "No debería encontrar una especie con ID inexistente")
+}
+
+// TEST 4: Actualizar
 func TestRepositorio_ActualizarEspecie(t *testing.T) {
 	repo := NuevoAlmacenSQLitePesca(abrirDBEnMemoria(t))
 	creada := repo.CrearEspecie(models.Especie{NombreComun: "Atún", UnidadMedida: "kg", Estado: true})
@@ -66,6 +74,7 @@ func TestRepositorio_ActualizarEspecie(t *testing.T) {
 	assert.False(t, ok)
 }
 
+// TEST 5: Borrar
 func TestRepositorio_BorrarEspecie(t *testing.T) {
 	repo := NuevoAlmacenSQLitePesca(abrirDBEnMemoria(t))
 	creada := repo.CrearEspecie(models.Especie{NombreComun: "Atún", UnidadMedida: "kg", Estado: true})
