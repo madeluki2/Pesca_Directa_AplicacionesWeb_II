@@ -1,0 +1,10 @@
+.git
+.gitignore
+*.db
+*.exe
+*.test
+.env
+.vscode
+tmp
+dist
+coverage.out
