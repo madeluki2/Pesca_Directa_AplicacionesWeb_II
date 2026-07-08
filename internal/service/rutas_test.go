@@ -29,32 +29,74 @@ func (m *rutaRepoMock) CrearTransportista(t models.Transportista) models.Transpo
 	return t
 }
 
-func (m *rutaRepoMock) ListarRutas() []models.Ruta                                   { return nil }
-func (m *rutaRepoMock) BuscarRutaPorID(id uint) (models.Ruta, bool)                  { return models.Ruta{}, false }
-func (m *rutaRepoMock) ActualizarRuta(id uint, d models.Ruta) (models.Ruta, bool)    { return d, true }
-func (m *rutaRepoMock) BorrarRuta(id uint) bool                                      { return true }
-func (m *rutaRepoMock) ListarPuntos() []models.Punto                                 { return nil }
-func (m *rutaRepoMock) BuscarPuntoPorID(id uint) (models.Punto, bool)                { return models.Punto{}, false }
-func (m *rutaRepoMock) CrearPunto(p models.Punto) models.Punto                       { return p }
-func (m *rutaRepoMock) ActualizarPunto(id uint, d models.Punto) (models.Punto, bool) { return d, true }
-func (m *rutaRepoMock) BorrarPunto(id uint) bool                                     { return true }
-func (m *rutaRepoMock) ListarTransportistas() []models.Transportista                 { return nil }
+func (m *rutaRepoMock) ListarRutas() []models.Ruta {
+	return nil
+}
+
+func (m *rutaRepoMock) BuscarRutaPorID(id uint) (models.Ruta, bool) {
+	return models.Ruta{}, false
+}
+
+func (m *rutaRepoMock) ActualizarRuta(id uint, d models.Ruta) (models.Ruta, bool) {
+	return d, true
+}
+
+func (m *rutaRepoMock) BorrarRuta(id uint) bool {
+	return true
+}
+
+func (m *rutaRepoMock) ListarPuntos() []models.Punto {
+	return nil
+}
+
+func (m *rutaRepoMock) BuscarPuntoPorID(id uint) (models.Punto, bool) {
+	return models.Punto{}, false
+}
+
+func (m *rutaRepoMock) CrearPunto(p models.Punto) models.Punto {
+	return p
+}
+
+func (m *rutaRepoMock) ActualizarPunto(id uint, d models.Punto) (models.Punto, bool) {
+	return d, true
+}
+
+func (m *rutaRepoMock) BorrarPunto(id uint) bool {
+	return true
+}
+
+func (m *rutaRepoMock) ListarTransportistas() []models.Transportista {
+	return nil
+}
+
 func (m *rutaRepoMock) BuscarTransportistaPorID(id uint) (models.Transportista, bool) {
 	return models.Transportista{}, false
 }
 func (m *rutaRepoMock) ActualizarTransportista(id uint, d models.Transportista) (models.Transportista, bool) {
 	return d, true
 }
-func (m *rutaRepoMock) BorrarTransportista(id uint) bool       { return true }
-func (m *rutaRepoMock) ListarEntregas() []models.EntregaPedido { return nil }
+func (m *rutaRepoMock) BorrarTransportista(id uint) bool {
+	return true
+}
+
+func (m *rutaRepoMock) ListarEntregas() []models.EntregaPedido {
+	return nil
+}
+
 func (m *rutaRepoMock) BuscarEntregaPorID(id uint) (models.EntregaPedido, bool) {
 	return models.EntregaPedido{}, false
 }
-func (m *rutaRepoMock) CrearEntrega(e models.EntregaPedido) models.EntregaPedido { return e }
+func (m *rutaRepoMock) CrearEntrega(e models.EntregaPedido) models.EntregaPedido {
+	return e
+}
+
 func (m *rutaRepoMock) ActualizarEntrega(id uint, d models.EntregaPedido) (models.EntregaPedido, bool) {
 	return d, true
 }
-func (m *rutaRepoMock) BorrarEntrega(id uint) bool { return true }
+
+func (m *rutaRepoMock) BorrarEntrega(id uint) bool {
+	return true
+}
 
 // ─── Test CrearRuta ───────────────────────────────────────────────────────────
 

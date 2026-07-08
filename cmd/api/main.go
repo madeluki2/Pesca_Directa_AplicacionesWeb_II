@@ -4,95 +4,56 @@ package main
 import (
 	"log"
 	"net/http"
-	"os"
 
-	"github.com/glebarez/sqlite"
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
-	"gorm.io/gorm"
 
+	"Pesca_Directa_AplicacionesWeb_II/internal/config"
 	"Pesca_Directa_AplicacionesWeb_II/internal/handlers"
 	"Pesca_Directa_AplicacionesWeb_II/internal/middleware"
-	"Pesca_Directa_AplicacionesWeb_II/internal/models"
 	"Pesca_Directa_AplicacionesWeb_II/internal/service"
 	"Pesca_Directa_AplicacionesWeb_II/internal/storage"
 )
 
 func main() {
-	// ── 1. GORM: dueño del esquema ───────────────────────────────────────
-	gdb, err := gorm.Open(sqlite.Open("pesca.db"), &gorm.Config{})
+	cfg := config.Cargar()
+	if err := run(cfg); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func run(cfg config.Config) error {
+	// 1. Recursos de almacenamiento (Factory): sqlite en local, postgres en Docker.
+	recursos, err := storage.Inicializar(cfg.DBDriver, cfg.DBDsn, cfg.RutaDB, cfg.Backend)
 	if err != nil {
-		log.Fatal("no se pudo abrir la base de datos: ", err)
+		return err
 	}
-	if err := gdb.AutoMigrate(
-		&models.Usuario{},
-		&models.Pescador{},
-		&models.Embarcacion{},
-		&models.Especie{},
-		&models.Captura{},
-		&models.Bodega{},
-		&models.Stock{},
-		&models.Cliente{},
-		&models.Pedido{},
-		&models.DetallePedido{},
-		&models.Ruta{},
-		&models.Punto{},
-		&models.Transportista{},
-		&models.EntregaPedido{},
-	); err != nil {
-		log.Fatal("falló AutoMigrate: ", err)
-	}
+	defer func() { _ = recursos.Cerrar() }()
+	log.Printf("Motor de base de datos: %s | Backend: %s", cfg.DBDriver, recursos.BackendUsado)
 
-	// ── 2. Elegir el backend según la variable STORAGE ───────────────────
-	var almacenPesca storage.AlmacenPesca
-	var almacenPedidos storage.Almacen
-	var almacenRutas storage.AlmacenRutas
+	// 2. Services con inyeccion de dependencias.
+	authService := service.NewAuthService(recursos.Usuarios)
+	pescaService := service.NewPescaService(recursos.AlmacenPesca)
+	pedidoService := service.NewPedidoService(recursos.AlmacenPedidos)
+	rutasService := service.NewRutasService(recursos.AlmacenRutas)
 
-	switch os.Getenv("STORAGE") {
-	case "memoria":
-		almacenPesca = storage.NuevaMemoriaPesca()
-		m := storage.NewMemoria()
-		m.Seed()
-		almacenPedidos = m
-		almacenRutas = storage.NuevoAlmacenSQLiteRutas(gdb)
-		log.Println("Backend de almacenamiento: Memoria (datos volátiles)")
-	default:
-		almacenPesca = storage.NuevoAlmacenSQLitePesca(gdb)
-		almacenPedidos = storage.NuevoAlmacenSQLite(gdb)
-		almacenRutas = storage.NuevoAlmacenSQLiteRutas(gdb)
-		log.Println("Backend de almacenamiento: GORM + SQLite (pesca.db)")
-	}
-
-	// ── 3. UserRepository: siempre GORM ─────────────────────────────────
-	usuarioRepo := storage.NewUsuarioGORM(gdb)
-
-	// ── 4. Services con inyección de dependencias ────────────────────────
-	authService := service.NewAuthService(usuarioRepo)
-	pescaService := service.NewPescaService(almacenPesca)
-	pedidoService := service.NewPedidoService(almacenPedidos)
-	rutasService := service.NewRutasService(almacenRutas)
-
-	// ── 5. Server: punto único de entrada para los handlers ──────────────
+	// 3. Server: punto unico de entrada para los handlers.
 	servidor := handlers.NewServer(pescaService, pedidoService, rutasService, authService)
 
-	// ── 6. Router + middlewares globales ─────────────────────────────────
+	// 4. Router + middlewares globales.
 	r := chi.NewRouter()
 	r.Use(chimw.Logger)
 	r.Use(chimw.Recoverer)
 	r.Use(middleware.CORS)
 
-	// ── 7. Rutas versionadas /api/v1/ ────────────────────────────────────
+	// 5. Rutas versionadas /api/v1/ (idénticas a las que ya tenías).
 	r.Route("/api/v1", func(r chi.Router) {
-
-		// Públicas — sin token
 		r.Post("/auth/register", servidor.Registrar)
 		r.Post("/auth/login", servidor.Login)
 
-		// Protegidas — requieren: Authorization: Bearer <token>
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.Auth(authService))
 
-			// ── Anthony: Gestión de Pesca ─────────────────────────────
 			r.Get("/pescadores", servidor.ListarPescadores)
 			r.Post("/pescadores", servidor.CrearPescador)
 			r.Get("/pescadores/{id}", servidor.ObtenerPescador)
@@ -129,7 +90,6 @@ func main() {
 			r.Put("/stocks/{id}", servidor.ActualizarStock)
 			r.Delete("/stocks/{id}", servidor.BorrarStock)
 
-			// ── Ilaria: Gestión de Pedidos ────────────────────────────
 			r.Get("/clientes", servidor.ListarClientes)
 			r.Post("/clientes", servidor.CrearCliente)
 			r.Get("/clientes/{id}", servidor.ObtenerCliente)
@@ -149,7 +109,6 @@ func main() {
 			r.Put("/detalles-pedido/{id}", servidor.ActualizarDetalle)
 			r.Delete("/detalles-pedido/{id}", servidor.EliminarDetalle)
 
-			// ── Madelyn: Rutas de Distribución ────────────────────────
 			r.Get("/rutas", servidor.ListarRutas)
 			r.Post("/rutas", servidor.CrearRuta)
 			r.Get("/rutas/{id}", servidor.ObtenerRuta)
@@ -176,6 +135,6 @@ func main() {
 		})
 	})
 
-	log.Println("Servidor Pesca-Directa Tarqui escuchando en http://localhost:8080")
-	log.Fatal(http.ListenAndServe(":8080", r))
+	log.Printf("Servidor Pesca-Directa Tarqui escuchando en http://localhost%s", cfg.Puerto)
+	return http.ListenAndServe(cfg.Puerto, r)
 }
