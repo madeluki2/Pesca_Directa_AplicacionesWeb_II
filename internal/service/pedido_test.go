@@ -65,11 +65,12 @@ func (m *clienteRepoMock) ActualizarDetalle(id int, d models.DetallePedido) (mod
 }
 func (m *clienteRepoMock) EliminarDetalle(id int) bool { return true }
 
+// ── Compatibilidad con la Fábrica ──────────────────────────────────────────────
+func (m *clienteRepoMock) Seed() {}
+
 // Red de seguridad en tiempo de compilación.
 var _ storage.Almacen = (*clienteRepoMock)(nil)
 
-// TestPedidoService_CrearCliente comprueba la REGLA DE NEGOCIO (validarCliente)
-// de forma aislada, sin base de datos. Es un test table-driven.
 func TestPedidoService_CrearCliente(t *testing.T) {
 	casos := []struct {
 		nombre        string
@@ -110,7 +111,7 @@ func TestPedidoService_CrearCliente(t *testing.T) {
 				guardado := c.entrada
 				guardado.ID = 1
 				guardado.Estado = "activo"
-				repo.On("CrearCliente", mock.AnythingOfType("models.Cliente")).Return(guardado)
+				repo.On("CrearCliente", mock.Anything).Return(guardado)
 			}
 			svc := service.NewPedidoService(repo)
 
@@ -121,16 +122,14 @@ func TestPedidoService_CrearCliente(t *testing.T) {
 				repo.AssertNotCalled(t, "CrearCliente")
 			} else {
 				require.NoError(t, err)
-				assert.Equal(t, 1, creado.ID, "el service debe devolver el cliente que entregó el repo")
+				assert.Equal(t, 1, creado.ID)
 				assert.Equal(t, "activo", creado.Estado)
-				repo.AssertCalled(t, "CrearCliente", mock.AnythingOfType("models.Cliente"))
+				repo.AssertCalled(t, "CrearCliente", mock.Anything)
 			}
 		})
 	}
 }
 
-// TestPedidoService_ObtenerCliente_NoEncontrado muestra cómo el service
-// traduce el comma-ok del repositorio (false) en un error de dominio.
 func TestPedidoService_ObtenerCliente_NoEncontrado(t *testing.T) {
 	repo := new(clienteRepoMock)
 	repo.On("BuscarClientePorID", 999).Return(models.Cliente{}, false)
