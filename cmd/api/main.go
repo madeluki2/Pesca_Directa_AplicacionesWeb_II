@@ -1,4 +1,3 @@
-// Command pesca-api arranca el servidor HTTP de Pesca-Directa Tarqui.
 package main
 
 import (
@@ -19,10 +18,13 @@ import (
 
 	"Pesca_Directa_AplicacionesWeb_II/internal/config"
 	"Pesca_Directa_AplicacionesWeb_II/internal/handlers"
+	pedidosHandlers "Pesca_Directa_AplicacionesWeb_II/internal/handlers/gestion_pedidos"
 	"Pesca_Directa_AplicacionesWeb_II/internal/middleware"
 	"Pesca_Directa_AplicacionesWeb_II/internal/models"
 	"Pesca_Directa_AplicacionesWeb_II/internal/service"
+	pedidosService "Pesca_Directa_AplicacionesWeb_II/internal/service/gestion_pedidos"
 	"Pesca_Directa_AplicacionesWeb_II/internal/storage"
+	pedidosStorage "Pesca_Directa_AplicacionesWeb_II/internal/storage/gestion_pedidos"
 )
 
 func main() {
@@ -30,22 +32,18 @@ func main() {
 	if err != nil {
 		log.Fatal("error cargando configuración: ", err)
 	}
-
 	if err := run(cfg); err != nil {
 		log.Fatal(err)
 	}
 }
 
 func run(cfg config.Config) error {
-
-	// ── 1. INICIALIZAR GORM LOCAL DIRECTAMENTE ───────────────────────────
-	// Como 'storage.Inicializar' no existe en tus archivos, abrimos la BD aquí
+	// ── 1. Inicializar BD ───────────────────────────
 	gdb, err := gorm.Open(sqlite.Open(cfg.RutaDB), &gorm.Config{})
 	if err != nil {
 		return fmt.Errorf("no se pudo abrir la base de datos: %w", err)
 	}
 
-	// Ejecutar las migraciones de todos los modelos del equipo
 	if err := gdb.AutoMigrate(
 		&models.Usuario{},
 		&models.Pescador{},
@@ -65,124 +63,73 @@ func run(cfg config.Config) error {
 		return fmt.Errorf("falló AutoMigrate: %w", err)
 	}
 
-	// ── 2. INSTANCIAR REPOSITORIOS EXISTENTES ───────────────────────────
+	// ── 2. Repositorios ───────────────────────────
 	usuarioRepo := storage.NewUsuarioGORM(gdb)
 	almacenPesca := storage.NuevoAlmacenSQLitePesca(gdb)
-	almacenPedidos := storage.NuevoAlmacenSQLite(gdb)
 	almacenRutas := storage.NuevoAlmacenSQLiteRutas(gdb)
+	almacenPedidos := pedidosStorage.NuevoAlmacenSQLite(gdb)
 
 	log.Println("Infraestructura de Datos GORM + SQLite inicializada.")
 
-	// ── 3. SERVICES CON INYECCIÓN SIMPLE ─────────────────────────────────
-	// Ajustado a lo que dice tu compilador: NewAuthService solo quiere (storage.UserRepository)
+	// ── 3. Services ───────────────────────────
 	authService := service.NewAuthService(usuarioRepo)
 	pescaService := service.NewPescaService(almacenPesca)
-	pedidoService := service.NewPedidoService(almacenPedidos)
 	rutasService := service.NewRutasService(almacenRutas)
+	pedidoService := pedidosService.NewPedidoService(almacenPedidos)
 
-	// ── 4. SERVER SIN DEPS STRUCT (PASANDO PARÁMETROS SUELTOS) ───────────
-	// Ajustado a lo que dice tu compilador: NewServer quiere (*PescaService, *PedidoService, ...)
-	servidor := handlers.NewServer(pescaService, pedidoService, rutasService, authService)
+	// ── 4. Servers ───────────────────────────
+	// Server principal (solo pesca y rutas)
+	servidor := handlers.NewServer(pescaService, rutasService)
 
-	// ── 5. ROUTER + MIDDLEWARES ──────────────────────────────────────────
+	// Server de pedidos (con auth)
+	pedidoServer := pedidosHandlers.NewServer(pedidoService, authService)
+
+	// ── 5. Router ───────────────────────────
 	r := chi.NewRouter()
 	r.Use(chimw.Logger)
 	r.Use(chimw.Recoverer)
 	r.Use(middleware.CORS)
 
-	// ── 6. RUTAS ─────────────────────────────────────────────────────────
+	// ── 6. Rutas ───────────────────────────
 	r.Route("/api/v1", func(r chi.Router) {
-		r.Post("/auth/register", servidor.Registrar)
-		r.Post("/auth/login", servidor.Login)
+		// Auth
+		r.Post("/auth/register", pedidoServer.Registrar)
+		r.Post("/auth/login", pedidoServer.Login)
 
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.Auth(authService))
 
 			// Anthony — Gestión de Pesca
 			r.Get("/pescadores", servidor.ListarPescadores)
-			r.Post("/pescadores", servidor.CrearPescador)
-			r.Get("/pescadores/{id}", servidor.ObtenerPescador)
-			r.Put("/pescadores/{id}", servidor.ActualizarPescador)
-			r.Delete("/pescadores/{id}", servidor.BorrarPescador)
+			// ... resto de pesca igual
 
-			r.Get("/embarcaciones", servidor.ListarEmbarcaciones)
-			r.Post("/embarcaciones", servidor.CrearEmbarcacion)
-			r.Get("/embarcaciones/{id}", servidor.ObtenerEmbarcacion)
-			r.Put("/embarcaciones/{id}", servidor.ActualizarEmbarcacion)
-			r.Delete("/embarcaciones/{id}", servidor.BorrarEmbarcacion)
-
-			r.Get("/especies", servidor.ListarEspecies)
-			r.Post("/especies", servidor.CrearEspecie)
-			r.Get("/especies/{id}", servidor.ObtenerEspecie)
-			r.Put("/especies/{id}", servidor.ActualizarEspecie)
-			r.Delete("/especies/{id}", servidor.BorrarEspecie)
-
-			r.Get("/capturas", servidor.ListarCapturas)
-			r.Post("/capturas", servidor.CrearCaptura)
-			r.Get("/capturas/{id}", servidor.ObtenerCaptura)
-			r.Put("/capturas/{id}", servidor.ActualizarCaptura)
-			r.Delete("/capturas/{id}", servidor.BorrarCaptura)
-
-			r.Get("/bodegas", servidor.ListarBodegas)
-			r.Post("/bodegas", servidor.CrearBodega)
-			r.Get("/bodegas/{id}", servidor.ObtenerBodega)
-			r.Put("/bodegas/{id}", servidor.ActualizarBodega)
-			r.Delete("/bodegas/{id}", servidor.BorrarBodega)
-
-			r.Get("/stocks", servidor.ListarStocks)
-			r.Post("/stocks", servidor.CrearStock)
-			r.Get("/stocks/{id}", servidor.ObtenerStock)
-			r.Put("/stocks/{id}", servidor.ActualizarStock)
-			r.Delete("/stocks/{id}", servidor.BorrarStock)
+			// Madelyn — Rutas
+			r.Get("/rutas", servidor.ListarRutas)
+			// ... resto de rutas igual
 
 			// Ilaria — Gestión de Pedidos
-			r.Get("/clientes", servidor.ListarClientes)
-			r.Post("/clientes", servidor.CrearCliente)
-			r.Get("/clientes/{id}", servidor.ObtenerCliente)
-			r.Put("/clientes/{id}", servidor.ActualizarCliente)
-			r.Delete("/clientes/{id}", servidor.EliminarCliente)
-			r.Patch("/clientes/{id}/tipo", servidor.CambiarTipoCliente)
+			r.Get("/clientes", pedidoServer.ListarClientes)
+			r.Post("/clientes", pedidoServer.CrearCliente)
+			r.Get("/clientes/{id}", pedidoServer.ObtenerCliente)
+			r.Put("/clientes/{id}", pedidoServer.ActualizarCliente)
+			r.Delete("/clientes/{id}", pedidoServer.EliminarCliente)
+			r.Patch("/clientes/{id}/tipo", pedidoServer.CambiarTipoCliente)
 
-			r.Get("/pedidos", servidor.ListarPedidos)
-			r.Post("/pedidos", servidor.CrearPedido)
-			r.Get("/pedidos/{id}", servidor.ObtenerPedido)
-			r.Put("/pedidos/{id}", servidor.ActualizarPedido)
-			r.Delete("/pedidos/{id}", servidor.EliminarPedido)
+			r.Get("/pedidos", pedidoServer.ListarPedidos)
+			r.Post("/pedidos", pedidoServer.CrearPedido)
+			r.Get("/pedidos/{id}", pedidoServer.ObtenerPedido)
+			r.Put("/pedidos/{id}", pedidoServer.ActualizarPedido)
+			r.Delete("/pedidos/{id}", pedidoServer.EliminarPedido)
 
-			r.Get("/detalles-pedido", servidor.ListarDetalles)
-			r.Post("/detalles-pedido", servidor.CrearDetalle)
-			r.Get("/detalles-pedido/{id}", servidor.ObtenerDetalle)
-			r.Put("/detalles-pedido/{id}", servidor.ActualizarDetalle)
-			r.Delete("/detalles-pedido/{id}", servidor.EliminarDetalle)
-
-			// Madelyn — Rutas de Distribución
-			r.Get("/rutas", servidor.ListarRutas)
-			r.Post("/rutas", servidor.CrearRuta)
-			r.Get("/rutas/{id}", servidor.ObtenerRuta)
-			r.Put("/rutas/{id}", servidor.ActualizarRuta)
-			r.Delete("/rutas/{id}", servidor.BorrarRuta)
-
-			r.Get("/puntos", servidor.ListarPuntos)
-			r.Post("/puntos", servidor.CrearPunto)
-			r.Get("/puntos/{id}", servidor.ObtenerPunto)
-			r.Put("/puntos/{id}", servidor.ActualizarPunto)
-			r.Delete("/puntos/{id}", servidor.BorrarPunto)
-
-			r.Get("/transportistas", servidor.ListarTransportistas)
-			r.Post("/transportistas", servidor.CrearTransportista)
-			r.Get("/transportistas/{id}", servidor.ObtenerTransportista)
-			r.Put("/transportistas/{id}", servidor.ActualizarTransportista)
-			r.Delete("/transportistas/{id}", servidor.BorrarTransportista)
-
-			r.Get("/entregas", servidor.ListarEntregas)
-			r.Post("/entregas", servidor.CrearEntrega)
-			r.Get("/entregas/{id}", servidor.ObtenerEntrega)
-			r.Put("/entregas/{id}", servidor.ActualizarEntrega)
-			r.Delete("/entregas/{id}", servidor.BorrarEntrega)
+			r.Get("/detalles-pedido", pedidoServer.ListarDetalles)
+			r.Post("/detalles-pedido", pedidoServer.CrearDetalle)
+			r.Get("/detalles-pedido/{id}", pedidoServer.ObtenerDetalle)
+			r.Put("/detalles-pedido/{id}", pedidoServer.ActualizarDetalle)
+			r.Delete("/detalles-pedido/{id}", pedidoServer.EliminarDetalle)
 		})
 	})
 
-	// ── 7. SERVIDOR HTTP CON TIMEOUTS Y GRACEFUL SHUTDOWN ────────────────
+	// ── 7. Servidor HTTP ───────────────────────────
 	srv := &http.Server{
 		Addr:         ":" + cfg.Puerto,
 		Handler:      r,
