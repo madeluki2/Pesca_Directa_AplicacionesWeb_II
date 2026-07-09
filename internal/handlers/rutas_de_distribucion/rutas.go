@@ -1,4 +1,4 @@
-package handlers
+package rutas_de_distribucion
 
 import (
 	"encoding/json"
@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	. "Pesca_Directa_AplicacionesWeb_II/internal/handlers"
 	"Pesca_Directa_AplicacionesWeb_II/internal/models"
 )
 
@@ -22,11 +23,11 @@ func parseUintID(r *http.Request) (uint, bool) {
 
 // ════════════════════════════ RUTAS ═══════════════════════════════════════
 
-func (s *Server) ListarRutas(w http.ResponseWriter, r *http.Request) {
+func (s *Server0) ListarRutas(w http.ResponseWriter, r *http.Request) {
 	RespondJSON(w, http.StatusOK, s.Rutas.ListarRutas())
 }
 
-func (s *Server) ObtenerRuta(w http.ResponseWriter, r *http.Request) {
+func (s *Server0) ObtenerRuta(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseUintID(r)
 	if !ok {
 		RespondError(w, http.StatusBadRequest, "ID debe ser un número entero positivo")
@@ -40,12 +41,19 @@ func (s *Server) ObtenerRuta(w http.ResponseWriter, r *http.Request) {
 	RespondJSON(w, http.StatusOK, ruta)
 }
 
-func (s *Server) CrearRuta(w http.ResponseWriter, r *http.Request) {
+func (s *Server0) CrearRuta(w http.ResponseWriter, r *http.Request) {
 	var body models.Ruta
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		RespondError(w, http.StatusBadRequest, "JSON inválido: "+err.Error())
 		return
 	}
+
+	// ─── VALIDACIÓN ADICIONAL PARA PASAR EL TEST ───
+	if body.Nombre == "" {
+		RespondError(w, http.StatusBadRequest, "nombre es requerido")
+		return
+	}
+
 	ruta, err := s.Rutas.CrearRuta(body)
 	if err != nil {
 		RespondError(w, statusDeError(err), err.Error())
@@ -54,7 +62,7 @@ func (s *Server) CrearRuta(w http.ResponseWriter, r *http.Request) {
 	RespondJSON(w, http.StatusCreated, ruta)
 }
 
-func (s *Server) ActualizarRuta(w http.ResponseWriter, r *http.Request) {
+func (s *Server0) ActualizarRuta(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseUintID(r)
 	if !ok {
 		RespondError(w, http.StatusBadRequest, "ID debe ser un número entero positivo")
@@ -73,7 +81,7 @@ func (s *Server) ActualizarRuta(w http.ResponseWriter, r *http.Request) {
 	RespondJSON(w, http.StatusOK, ruta)
 }
 
-func (s *Server) BorrarRuta(w http.ResponseWriter, r *http.Request) {
+func (s *Server0) BorrarRuta(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseUintID(r)
 	if !ok {
 		RespondError(w, http.StatusBadRequest, "ID debe ser un número entero positivo")
@@ -88,11 +96,11 @@ func (s *Server) BorrarRuta(w http.ResponseWriter, r *http.Request) {
 
 // ════════════════════════════ PUNTOS ══════════════════════════════════════
 
-func (s *Server) ListarPuntos(w http.ResponseWriter, r *http.Request) {
+func (s *Server0) ListarPuntos(w http.ResponseWriter, r *http.Request) {
 	RespondJSON(w, http.StatusOK, s.Rutas.ListarPuntos())
 }
 
-func (s *Server) ObtenerPunto(w http.ResponseWriter, r *http.Request) {
+func (s *Server0) ObtenerPunto(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseUintID(r)
 	if !ok {
 		RespondError(w, http.StatusBadRequest, "ID debe ser un número entero positivo")
@@ -106,7 +114,7 @@ func (s *Server) ObtenerPunto(w http.ResponseWriter, r *http.Request) {
 	RespondJSON(w, http.StatusOK, punto)
 }
 
-func (s *Server) CrearPunto(w http.ResponseWriter, r *http.Request) {
+func (s *Server0) CrearPunto(w http.ResponseWriter, r *http.Request) {
 	var body models.Punto
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		RespondError(w, http.StatusBadRequest, "JSON inválido: "+err.Error())
@@ -120,7 +128,7 @@ func (s *Server) CrearPunto(w http.ResponseWriter, r *http.Request) {
 	RespondJSON(w, http.StatusCreated, punto)
 }
 
-func (s *Server) ActualizarPunto(w http.ResponseWriter, r *http.Request) {
+func (s *Server0) ActualizarPunto(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseUintID(r)
 	if !ok {
 		RespondError(w, http.StatusBadRequest, "ID debe ser un número entero positivo")
@@ -139,7 +147,7 @@ func (s *Server) ActualizarPunto(w http.ResponseWriter, r *http.Request) {
 	RespondJSON(w, http.StatusOK, punto)
 }
 
-func (s *Server) BorrarPunto(w http.ResponseWriter, r *http.Request) {
+func (s *Server0) BorrarPunto(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseUintID(r)
 	if !ok {
 		RespondError(w, http.StatusBadRequest, "ID debe ser un número entero positivo")
@@ -154,11 +162,11 @@ func (s *Server) BorrarPunto(w http.ResponseWriter, r *http.Request) {
 
 // ════════════════════════════ TRANSPORTISTAS ══════════════════════════════
 
-func (s *Server) ListarTransportistas(w http.ResponseWriter, r *http.Request) {
+func (s *Server0) ListarTransportistas(w http.ResponseWriter, r *http.Request) {
 	RespondJSON(w, http.StatusOK, s.Rutas.ListarTransportistas())
 }
 
-func (s *Server) ObtenerTransportista(w http.ResponseWriter, r *http.Request) {
+func (s *Server0) ObtenerTransportista(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseUintID(r)
 	if !ok {
 		RespondError(w, http.StatusBadRequest, "ID debe ser un número entero positivo")
@@ -172,7 +180,7 @@ func (s *Server) ObtenerTransportista(w http.ResponseWriter, r *http.Request) {
 	RespondJSON(w, http.StatusOK, t)
 }
 
-func (s *Server) CrearTransportista(w http.ResponseWriter, r *http.Request) {
+func (s *Server0) CrearTransportista(w http.ResponseWriter, r *http.Request) {
 	var body models.Transportista
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		RespondError(w, http.StatusBadRequest, "JSON inválido: "+err.Error())
@@ -186,7 +194,7 @@ func (s *Server) CrearTransportista(w http.ResponseWriter, r *http.Request) {
 	RespondJSON(w, http.StatusCreated, t)
 }
 
-func (s *Server) ActualizarTransportista(w http.ResponseWriter, r *http.Request) {
+func (s *Server0) ActualizarTransportista(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseUintID(r)
 	if !ok {
 		RespondError(w, http.StatusBadRequest, "ID debe ser un número entero positivo")
@@ -205,7 +213,7 @@ func (s *Server) ActualizarTransportista(w http.ResponseWriter, r *http.Request)
 	RespondJSON(w, http.StatusOK, t)
 }
 
-func (s *Server) BorrarTransportista(w http.ResponseWriter, r *http.Request) {
+func (s *Server0) BorrarTransportista(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseUintID(r)
 	if !ok {
 		RespondError(w, http.StatusBadRequest, "ID debe ser un número entero positivo")
@@ -220,11 +228,11 @@ func (s *Server) BorrarTransportista(w http.ResponseWriter, r *http.Request) {
 
 // ════════════════════════════ ENTREGAS ════════════════════════════════════
 
-func (s *Server) ListarEntregas(w http.ResponseWriter, r *http.Request) {
+func (s *Server0) ListarEntregas(w http.ResponseWriter, r *http.Request) {
 	RespondJSON(w, http.StatusOK, s.Rutas.ListarEntregas())
 }
 
-func (s *Server) ObtenerEntrega(w http.ResponseWriter, r *http.Request) {
+func (s *Server0) ObtenerEntrega(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseUintID(r)
 	if !ok {
 		RespondError(w, http.StatusBadRequest, "ID debe ser un número entero positivo")
@@ -238,7 +246,7 @@ func (s *Server) ObtenerEntrega(w http.ResponseWriter, r *http.Request) {
 	RespondJSON(w, http.StatusOK, e)
 }
 
-func (s *Server) CrearEntrega(w http.ResponseWriter, r *http.Request) {
+func (s *Server0) CrearEntrega(w http.ResponseWriter, r *http.Request) {
 	var body models.EntregaPedido
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		RespondError(w, http.StatusBadRequest, "JSON inválido: "+err.Error())
@@ -252,7 +260,7 @@ func (s *Server) CrearEntrega(w http.ResponseWriter, r *http.Request) {
 	RespondJSON(w, http.StatusCreated, e)
 }
 
-func (s *Server) ActualizarEntrega(w http.ResponseWriter, r *http.Request) {
+func (s *Server0) ActualizarEntrega(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseUintID(r)
 	if !ok {
 		RespondError(w, http.StatusBadRequest, "ID debe ser un número entero positivo")
@@ -271,7 +279,7 @@ func (s *Server) ActualizarEntrega(w http.ResponseWriter, r *http.Request) {
 	RespondJSON(w, http.StatusOK, e)
 }
 
-func (s *Server) BorrarEntrega(w http.ResponseWriter, r *http.Request) {
+func (s *Server0) BorrarEntrega(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseUintID(r)
 	if !ok {
 		RespondError(w, http.StatusBadRequest, "ID debe ser un número entero positivo")

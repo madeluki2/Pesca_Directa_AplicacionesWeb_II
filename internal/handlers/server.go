@@ -10,21 +10,15 @@ import (
 type Server struct {
 	Pesca   *service.PescaService  // Anthony  — Gestión de Pesca
 	Pedidos *service.PedidoService // Ilaria   — Gestión de Pedidos
-	Rutas   *service.RutasService  // Madelyn  — Rutas de Distribución
-	Auth    *service.AuthService   // Compartido — autenticación JWT
 }
 
 // NewServer crea el servidor con todos los services inyectados.
 func NewServer(
 	pesca *service.PescaService,
 	pedidos *service.PedidoService,
-	rutas *service.RutasService,
-	auth *service.AuthService,
 ) *Server {
 	return &Server{
 		Pesca:   pesca,
 		Pedidos: pedidos,
-		Rutas:   rutas,
-		Auth:    auth,
 	}
 }
