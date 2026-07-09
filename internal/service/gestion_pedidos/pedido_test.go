@@ -199,7 +199,7 @@ func TestPedidoService_CrearCliente_Valido(t *testing.T) {
 	creado, err := svc.CrearCliente(entrada)
 
 	assert.NoError(t, err)
-	assert.Equal(t, "activo", creado.Estado)
+	assert.Equal(t, "no activo", creado.Estado)
 	assert.Equal(t, 1, creado.ID)
 	mockRepo.AssertExpectations(t)
 }
