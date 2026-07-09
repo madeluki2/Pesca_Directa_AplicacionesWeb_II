@@ -1,10 +1,11 @@
-package service
+package rutas_de_distribucion
 
 import (
 	"strings"
 
 	"Pesca_Directa_AplicacionesWeb_II/internal/models"
-	"Pesca_Directa_AplicacionesWeb_II/internal/storage"
+	. "Pesca_Directa_AplicacionesWeb_II/internal/service"
+	storage "Pesca_Directa_AplicacionesWeb_II/internal/storage/rutas_de_distribucion"
 )
 
 // RutasService concentra toda la lógica de negocio del módulo de rutas de distribución.

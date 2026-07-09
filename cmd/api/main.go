@@ -10,8 +10,10 @@ import (
 
 	"Pesca_Directa_AplicacionesWeb_II/internal/config"
 	"Pesca_Directa_AplicacionesWeb_II/internal/handlers"
+	handlersRutas "Pesca_Directa_AplicacionesWeb_II/internal/handlers/rutas_de_distribucion"
 	"Pesca_Directa_AplicacionesWeb_II/internal/middleware"
 	"Pesca_Directa_AplicacionesWeb_II/internal/service"
+	rutasSvc "Pesca_Directa_AplicacionesWeb_II/internal/service/rutas_de_distribucion"
 	"Pesca_Directa_AplicacionesWeb_II/internal/storage"
 )
 
@@ -33,12 +35,16 @@ func run(cfg config.Config) error {
 
 	// 2. Services con inyeccion de dependencias.
 	authService := service.NewAuthService(recursos.Usuarios)
-	pescaService := service.NewPescaService(recursos.AlmacenPesca)
-	pedidoService := service.NewPedidoService(recursos.AlmacenPedidos)
-	rutasService := service.NewRutasService(recursos.AlmacenRutas)
+	pescaService := service.NewPescaService(recursos.Pesca)
+	pedidoService := service.NewPedidoService(recursos.Pedidos)
+	rutasService := rutasSvc.NewRutasService(recursos.Rutas)
 
-	// 3. Server: punto unico de entrada para los handlers.
-	servidor := handlers.NewServer(pescaService, pedidoService, rutasService, authService)
+	// 3. Servers: punto de entrada para los handlers.
+	// Existen dos "Server" separados porque cada equipo definio el suyo:
+	// - handlers.Server        -> pescadores, embarcaciones, especies, capturas, bodegas, stocks, clientes, pedidos, detalles-pedido
+	// - handlersRutas.Server0  -> auth (registro/login), rutas, puntos, transportistas, entregas
+	servidor := handlers.NewServer(pescaService, pedidoService)
+	servidorRutas := handlersRutas.NewServer0(rutasService, authService)
 
 	// 4. Router + middlewares globales.
 	r := chi.NewRouter()
@@ -48,8 +54,8 @@ func run(cfg config.Config) error {
 
 	// 5. Rutas versionadas /api/v1/ (idénticas a las que ya tenías).
 	r.Route("/api/v1", func(r chi.Router) {
-		r.Post("/auth/register", servidor.Registrar)
-		r.Post("/auth/login", servidor.Login)
+		r.Post("/auth/register", servidorRutas.Registrar)
+		r.Post("/auth/login", servidorRutas.Login)
 
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.Auth(authService))
@@ -109,29 +115,29 @@ func run(cfg config.Config) error {
 			r.Put("/detalles-pedido/{id}", servidor.ActualizarDetalle)
 			r.Delete("/detalles-pedido/{id}", servidor.EliminarDetalle)
 
-			r.Get("/rutas", servidor.ListarRutas)
-			r.Post("/rutas", servidor.CrearRuta)
-			r.Get("/rutas/{id}", servidor.ObtenerRuta)
-			r.Put("/rutas/{id}", servidor.ActualizarRuta)
-			r.Delete("/rutas/{id}", servidor.BorrarRuta)
+			r.Get("/rutas", servidorRutas.ListarRutas)
+			r.Post("/rutas", servidorRutas.CrearRuta)
+			r.Get("/rutas/{id}", servidorRutas.ObtenerRuta)
+			r.Put("/rutas/{id}", servidorRutas.ActualizarRuta)
+			r.Delete("/rutas/{id}", servidorRutas.BorrarRuta)
 
-			r.Get("/puntos", servidor.ListarPuntos)
-			r.Post("/puntos", servidor.CrearPunto)
-			r.Get("/puntos/{id}", servidor.ObtenerPunto)
-			r.Put("/puntos/{id}", servidor.ActualizarPunto)
-			r.Delete("/puntos/{id}", servidor.BorrarPunto)
+			r.Get("/puntos", servidorRutas.ListarPuntos)
+			r.Post("/puntos", servidorRutas.CrearPunto)
+			r.Get("/puntos/{id}", servidorRutas.ObtenerPunto)
+			r.Put("/puntos/{id}", servidorRutas.ActualizarPunto)
+			r.Delete("/puntos/{id}", servidorRutas.BorrarPunto)
 
-			r.Get("/transportistas", servidor.ListarTransportistas)
-			r.Post("/transportistas", servidor.CrearTransportista)
-			r.Get("/transportistas/{id}", servidor.ObtenerTransportista)
-			r.Put("/transportistas/{id}", servidor.ActualizarTransportista)
-			r.Delete("/transportistas/{id}", servidor.BorrarTransportista)
+			r.Get("/transportistas", servidorRutas.ListarTransportistas)
+			r.Post("/transportistas", servidorRutas.CrearTransportista)
+			r.Get("/transportistas/{id}", servidorRutas.ObtenerTransportista)
+			r.Put("/transportistas/{id}", servidorRutas.ActualizarTransportista)
+			r.Delete("/transportistas/{id}", servidorRutas.BorrarTransportista)
 
-			r.Get("/entregas", servidor.ListarEntregas)
-			r.Post("/entregas", servidor.CrearEntrega)
-			r.Get("/entregas/{id}", servidor.ObtenerEntrega)
-			r.Put("/entregas/{id}", servidor.ActualizarEntrega)
-			r.Delete("/entregas/{id}", servidor.BorrarEntrega)
+			r.Get("/entregas", servidorRutas.ListarEntregas)
+			r.Post("/entregas", servidorRutas.CrearEntrega)
+			r.Get("/entregas/{id}", servidorRutas.ObtenerEntrega)
+			r.Put("/entregas/{id}", servidorRutas.ActualizarEntrega)
+			r.Delete("/entregas/{id}", servidorRutas.BorrarEntrega)
 		})
 	})
 

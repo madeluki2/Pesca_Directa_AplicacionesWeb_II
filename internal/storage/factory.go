@@ -5,32 +5,34 @@ import (
 	"log"
 	"time"
 
-	"github.com/glebarez/sqlite" // dialector GORM para SQLite (pure-Go)
-	"gorm.io/driver/postgres"    // dialector GORM para PostgreSQL
+	"github.com/glebarez/sqlite"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
 	"Pesca_Directa_AplicacionesWeb_II/internal/models"
+	. "Pesca_Directa_AplicacionesWeb_II/internal/storage/rutas_de_distribucion"
 )
 
-// Recursos agrupa todo lo que la capa de almacenamiento expone a main.go.
+// Recursos agrupa todo lo que la capa de almacenamiento expone a la aplicación.
+// Los campos son INTERFACES (no tipos concretos) para que tanto MemoriaPesca
+// como AlmacenSQLitePesca puedan asignarse sin error de tipo.
 type Recursos struct {
-	AlmacenPesca   AlmacenPesca
-	AlmacenPedidos Almacen
-	AlmacenRutas   AlmacenRutas
-	Usuarios       UserRepository
-	BackendUsado   string
-	Cerrar         func() error
+	Pesca        AlmacenPesca   // interfaz — acepta MemoriaPesca o AlmacenSQLitePesca
+	Pedidos      Almacen        // interfaz — acepta Memoria o AlmacenSQLite
+	Rutas        AlmacenRutas   // interfaz — acepta MemoriaRutas o AlmacenSQLiteRutas
+	Usuarios     UserRepository // siempre GORM
+	BackendUsado string
+	Cerrar       func() error
 }
 
-// Inicializar centraliza el plumbing de almacenamiento (patron Factory).
-// El motor (sqlite en local, postgres en Docker) se elige por config; el
-// backend de pesca/pedidos (memoria o gorm) se elige igual que antes.
+// Inicializar centraliza TODO el plumbing de almacenamiento (patrón Factory).
 func Inicializar(driver, dsn, rutaDB, backend string) (*Recursos, error) {
-	// 1. GORM es el dueño del esquema.
+	// 1. GORM abre la BD, migra el esquema y siembra datos iniciales.
 	gdb, err := abrirGorm(driver, dsn, rutaDB)
 	if err != nil {
 		return nil, err
 	}
+
 	if err := gdb.AutoMigrate(
 		&models.Usuario{},
 		&models.Pescador{},
@@ -50,26 +52,27 @@ func Inicializar(driver, dsn, rutaDB, backend string) (*Recursos, error) {
 		return nil, fmt.Errorf("AutoMigrate: %w", err)
 	}
 
-	// 2. Elegir el backend de pesca/pedidos (rutas siempre vive en GORM,
-	//    igual que en tu main.go original).
+	// 2. Elegir backend según variable STORAGE.
+	// Las variables son de tipo interfaz → cualquier implementación es válida.
 	var almacenPesca AlmacenPesca
 	var almacenPedidos Almacen
-	almacenRutas := NuevoAlmacenSQLiteRutas(gdb)
+	var almacenRutas AlmacenRutas
 	backendUsado := "gorm"
 
-	switch backend {
-	case "memoria":
-		almacenPesca = NuevaMemoriaPesca()
+	if backend == "memoria" {
+		almacenPesca = NuevaMemoriaPesca() // *MemoriaPesca implementa AlmacenPesca ✓
 		m := NewMemoria()
 		m.Seed()
-		almacenPedidos = m
+		almacenPedidos = m                 // *Memoria implementa Almacen ✓
+		almacenRutas = NuevaMemoriaRutas() // *MemoriaRutas implementa AlmacenRutas ✓
 		backendUsado = "memoria"
-	default:
+	} else {
 		almacenPesca = NuevoAlmacenSQLitePesca(gdb)
 		almacenPedidos = NuevoAlmacenSQLite(gdb)
+		almacenRutas = NuevoAlmacenSQLiteRutas(gdb)
 	}
 
-	// 3. Usuarios viven siempre en GORM.
+	// 3. Usuarios siempre en GORM.
 	usuarios := NewUsuarioGORM(gdb)
 
 	// 4. Cierre ordenado.
@@ -82,18 +85,17 @@ func Inicializar(driver, dsn, rutaDB, backend string) (*Recursos, error) {
 	}
 
 	return &Recursos{
-		AlmacenPesca:   almacenPesca,
-		AlmacenPedidos: almacenPedidos,
-		AlmacenRutas:   almacenRutas,
-		Usuarios:       usuarios,
-		BackendUsado:   backendUsado,
-		Cerrar:         cerrar,
+		Pesca:        almacenPesca,
+		Pedidos:      almacenPedidos,
+		Rutas:        almacenRutas,
+		Usuarios:     usuarios,
+		BackendUsado: backendUsado,
+		Cerrar:       cerrar,
 	}, nil
 }
 
-// abrirGorm elige el Dialector segun el driver. Para PostgreSQL reintenta
-// unos segundos: dentro de docker compose la base puede tardar en aceptar
-// conexiones aunque el contenedor ya este arriba.
+// abrirGorm elige el Dialector según el driver y abre la conexión.
+// Para PostgreSQL reintenta 10 veces con 2s de espera entre intentos.
 func abrirGorm(driver, dsn, rutaDB string) (*gorm.DB, error) {
 	switch driver {
 	case "postgres":
@@ -104,7 +106,7 @@ func abrirGorm(driver, dsn, rutaDB string) (*gorm.DB, error) {
 			if err == nil {
 				return gdb, nil
 			}
-			log.Printf("PostgreSQL no esta listo (intento %d/10): %v", intento, err)
+			log.Printf("PostgreSQL no está listo (intento %d/10): %v", intento, err)
 			time.Sleep(2 * time.Second)
 		}
 		return nil, fmt.Errorf("conectar a PostgreSQL tras reintentos: %w", err)

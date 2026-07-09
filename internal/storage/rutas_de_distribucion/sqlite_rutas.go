@@ -1,4 +1,4 @@
-package storage
+package rutas_de_distribucion
 
 import (
 	"gorm.io/gorm"

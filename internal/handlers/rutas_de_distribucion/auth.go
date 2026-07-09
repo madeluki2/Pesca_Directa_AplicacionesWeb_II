@@ -1,8 +1,10 @@
-package handlers
+package rutas_de_distribucion
 
 import (
 	"encoding/json"
 	"net/http"
+
+	. "Pesca_Directa_AplicacionesWeb_II/internal/handlers"
 )
 
 // credenciales es el body que reciben Registrar y Login.
@@ -12,7 +14,7 @@ type credenciales struct {
 }
 
 // Registrar atiende POST /api/v1/auth/register
-func (s *Server) Registrar(w http.ResponseWriter, r *http.Request) {
+func (s *Server0) Registrar(w http.ResponseWriter, r *http.Request) {
 	var creds credenciales
 	if err := json.NewDecoder(r.Body).Decode(&creds); err != nil {
 		RespondError(w, http.StatusBadRequest, "JSON inválido: "+err.Error())
@@ -29,7 +31,7 @@ func (s *Server) Registrar(w http.ResponseWriter, r *http.Request) {
 }
 
 // Login atiende POST /api/v1/auth/login
-func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
+func (s *Server0) Login(w http.ResponseWriter, r *http.Request) {
 	var creds credenciales
 	if err := json.NewDecoder(r.Body).Decode(&creds); err != nil {
 		RespondError(w, http.StatusBadRequest, "JSON inválido: "+err.Error())
