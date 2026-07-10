@@ -11,17 +11,26 @@ import (
 
 	"Pesca_Directa_AplicacionesWeb_II/internal/models"
 	pedidosStorage "Pesca_Directa_AplicacionesWeb_II/internal/storage/gestion_pedidos"
+<<<<<<< HEAD
 	pescaStorage "Pesca_Directa_AplicacionesWeb_II/internal/storage/gestion_pesca"
 	rutasStorage "Pesca_Directa_AplicacionesWeb_II/internal/storage/rutas_de_distribucion"
+=======
+>>>>>>> a7d7cf21cfe890d3e243c29e2cce8961e9021327
 )
 
 // Recursos agrupa todo lo que main.go necesita para arrancar: los tres
 // almacenes (uno por módulo), el repositorio de usuarios (compartido) y
 // una función para cerrar la conexión a la base de datos limpiamente.
 type Recursos struct {
+<<<<<<< HEAD
 	Pesca        pescaStorage.AlmacenPesca
 	Pedidos      pedidosStorage.Almacen
 	Rutas        rutasStorage.AlmacenRutas
+=======
+	Pesca        AlmacenPesca
+	Pedidos      pedidosStorage.Almacen
+	Rutas        AlmacenRutas
+>>>>>>> a7d7cf21cfe890d3e243c29e2cce8961e9021327
 	Usuarios     UserRepository
 	BackendUsado string
 	Cerrar       func() error
@@ -56,6 +65,7 @@ func Inicializar(driver, dsn, rutaDB, backend string) (*Recursos, error) {
 		return nil, fmt.Errorf("AutoMigrate: %w", err)
 	}
 
+<<<<<<< HEAD
 	var almacenRutas rutasStorage.AlmacenRutas
 	backendUsado := "gorm"
 
@@ -64,6 +74,19 @@ func Inicializar(driver, dsn, rutaDB, backend string) (*Recursos, error) {
 		backendUsado = "memoria"
 	} else {
 		almacenRutas = rutasStorage.NuevoAlmacenSQLiteRutas(gdb)
+=======
+	var almacenRutas AlmacenRutas
+	var almacenPesca AlmacenPesca
+	backendUsado := "gorm"
+
+	if backend == "memoria" {
+		almacenRutas = NuevaMemoriaRutas()
+		almacenPesca = NuevaMemoriaPesca()
+		backendUsado = "memoria"
+	} else {
+		almacenRutas = NuevoAlmacenSQLiteRutas(gdb)
+		almacenPesca = NuevoAlmacenSQLitePesca(gdb)
+>>>>>>> a7d7cf21cfe890d3e243c29e2cce8961e9021327
 	}
 
 	// Pedidos aún no tiene backend en memoria migrado; siempre usa GORM.
@@ -78,7 +101,11 @@ func Inicializar(driver, dsn, rutaDB, backend string) (*Recursos, error) {
 	}
 
 	return &Recursos{
+<<<<<<< HEAD
 		Pesca:        pescaStorage.NuevoAlmacenPesca(gdb, backend),
+=======
+		Pesca:        almacenPesca,
+>>>>>>> a7d7cf21cfe890d3e243c29e2cce8961e9021327
 		Pedidos:      almacenPedidos,
 		Rutas:        almacenRutas,
 		Usuarios:     NewUsuarioGORM(gdb),

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 services:
   db:
     image: postgres:16-alpine
@@ -30,3 +31,54 @@ services:
 
 volumes:
   dbdata:
+=======
+# ============================================================================
+# Pesca-Directa Tarqui — Docker Compose Mapeado a PostgreSQL
+# ============================================================================
+
+services:
+  api:
+    build: .                           # Usa el Dockerfile de este directorio raíz
+    container_name: pesca-directa-api
+    dns:
+      - 8.8.8.8        # <--- ¡ESTO FORZARÁ EL INTERNET DENTRO DEL CONTENEDOR!
+      - 8.8.4.4
+    environment:
+      PUERTO: "8080"
+      STORAGE: "gorm"
+      # Variables de control para tu inicialización en main.go
+      DB_DRIVER: "postgres"
+      DB_DSN: "host=db user=pesca_user password=pesca_password dbname=pesca_tarqui_db port=5432 sslmode=disable TimeZone=America/Guayaquil"
+      RUTA_DB: "/app/data/pesca.db"    # Ruta interna segura donde 'appuser' tiene permisos
+      # Variables de autenticación intactas
+      JWT_SECRETO: "cambia-esto-en-produccion-con-valor-largo-y-secreto"
+      JWT_DURACION: "24h"
+    ports:
+      - "8080:8080"                   # host:contenedor
+    volumes:
+      - dbdata:/app/data               # Mapea el volumen para que SQLite no rompa por permisos
+    depends_on:
+      db:
+        condition: service_healthy     # Espera a que Postgres pase el Healthcheck antes de lanzar la API
+
+  db:
+    image: postgres:16-alpine
+    container_name: pesca-postgres-db
+    environment:
+      POSTGRES_USER: pesca_user
+      POSTGRES_PASSWORD: pesca_password
+      POSTGRES_DB: pesca_tarqui_db
+    ports:
+      - "5432:5432"                    # Por si quieres conectar DBeaver o PgAdmin desde Windows
+    volumes:
+      - postgres_pesca_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pesca_user -d pesca_tarqui_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  dbdata:                              # Permite persistir la base de datos local /app/data
+  postgres_pesca_data:                 # Volumen nombrado para que tus datos de Postgres no se borren
+>>>>>>> a7d7cf21cfe890d3e243c29e2cce8961e9021327
