@@ -11,9 +11,11 @@ import (
 	"Pesca_Directa_AplicacionesWeb_II/internal/storage"
 )
 
-var secretJWT = []byte("pesca-directa-tarqui-secret-2026")
+const secretoPorDefecto = "pesca-directa-tarqui-secret-2026"
 
-const duracionToken = 24 * time.Hour
+const SecretoPorDefecto = secretoPorDefecto
+
+const duracionPorDefecto = 24 * time.Hour
 
 type Claims struct {
 	UsuarioID int `json:"usuario_id"`
@@ -21,13 +23,44 @@ type Claims struct {
 }
 
 type AuthService struct {
-	repo storage.UserRepository
+	repo     storage.UserRepository
+	secreto  []byte
+	duracion time.Duration
 }
 
-func NewAuthService(repo storage.UserRepository) *AuthService {
-	return &AuthService{repo: repo}
+type Opcion func(*AuthService)
+
+// WithSecreto inyecta la clave secreta para firmar tokens JWT.
+func WithSecreto(s string) Opcion {
+	return func(a *AuthService) {
+		if s != "" {
+			a.secreto = []byte(s)
+		}
+	}
 }
 
+func WithDuracionToken(d time.Duration) Opcion {
+	return func(a *AuthService) {
+		if d > 0 {
+			a.duracion = d
+		}
+	}
+}
+
+// NewAuthService crea el servicio de autenticación.
+func NewAuthService(repo storage.UserRepository, opts ...Opcion) *AuthService {
+	a := &AuthService{
+		repo:     repo,
+		secreto:  []byte(secretoPorDefecto),
+		duracion: duracionPorDefecto,
+	}
+	for _, opt := range opts {
+		opt(a)
+	}
+	return a
+}
+
+// Registrar valida los datos, hashea la contraseña y crea el usuario.
 func (s *AuthService) Registrar(email, password string) (models.Usuario, error) {
 	email = strings.TrimSpace(email)
 	password = strings.TrimSpace(password)
@@ -50,6 +83,7 @@ func (s *AuthService) Registrar(email, password string) (models.Usuario, error) 
 	})
 }
 
+// Login verifica las credenciales y devuelve un token JWT firmado.
 func (s *AuthService) Login(email, password string) (string, error) {
 	email = strings.TrimSpace(email)
 	password = strings.TrimSpace(password)
@@ -74,21 +108,20 @@ func (s *AuthService) GenerarToken(u models.Usuario) (string, error) {
 	claims := &Claims{
 		UsuarioID: u.ID,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(duracionToken)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(s.duracion)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(secretJWT)
+	return token.SignedString(s.secreto)
 }
 
-// ValidarToken parsea el token, verifica la firma y devuelve el UsuarioID.
 func (s *AuthService) ValidarToken(tokenStr string) (int, error) {
 	parsedToken, err := jwt.ParseWithClaims(tokenStr, &Claims{}, func(t *jwt.Token) (any, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, ErrCredencialesInvalidas
 		}
-		return secretJWT, nil
+		return s.secreto, nil
 	})
 	if err != nil || !parsedToken.Valid {
 		return 0, ErrCredencialesInvalidas
