@@ -1,44 +1,3 @@
-<<<<<<< HEAD
-<<<<<<< HEAD
-services:
-  db:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: pesca
-      POSTGRES_PASSWORD: pesca
-      POSTGRES_DB: pesca
-    ports:
-      - "5432:5432"
-    volumes:
-      - dbdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U pesca -d pesca"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-
-  api:
-    build: .
-    environment:
-      PUERTO: ":8080"
-      DB_DRIVER: postgres
-      DB_DSN: "host=db user=pesca password=pesca dbname=pesca port=5432 sslmode=disable TimeZone=America/Guayaquil"
-      STORAGE: gorm
-    ports:
-      - "8080:8080"
-    depends_on:
-      db:
-        condition: service_healthy
-
-volumes:
-  dbdata:
-=======
-# ============================================================================
-# Pesca-Directa Tarqui — Docker Compose Mapeado a PostgreSQL
-# ============================================================================
-
-=======
->>>>>>> 5350001560abd8ae5ce9a208a676c9635fbff78d
 services:
   db:
     image: postgres:16-alpine
@@ -75,11 +34,5 @@ services:
         condition: service_healthy
 
 volumes:
-<<<<<<< HEAD
-  dbdata:                              # Permite persistir la base de datos local /app/data
-  postgres_pesca_data:                 # Volumen nombrado para que tus datos de Postgres no se borren
->>>>>>> a7d7cf21cfe890d3e243c29e2cce8961e9021327
-=======
   dbdata:
   postgres_pesca_data:
->>>>>>> 5350001560abd8ae5ce9a208a676c9635fbff78d
