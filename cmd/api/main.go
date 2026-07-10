@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os/signal"
+	"strings" // Importación añadida para limpiar el prefijo del puerto en el log
 	"syscall"
 	"time"
 
@@ -39,8 +40,6 @@ func run(cfg config.Config) error {
 	log.Printf("Motor: %s | Backend: %s", cfg.DBDriver, recursos.BackendUsado)
 
 	// 2. Services — AuthService usa SecretJWT (var global actual).
-	//    Cuando se aplique el refactor de Options, esta línea cambia a:
-	//    service.NewAuthService(recursos.Usuarios, service.WithSecreto(cfg.JWTSecreto), ...)
 	authService := service.NewAuthService(recursos.Usuarios)
 	pescaSvc := pescaService.NewPescaService(recursos.Pesca)
 	pedidoService := service.NewPedidoService(recursos.Pedidos)
@@ -152,9 +151,14 @@ func run(cfg config.Config) error {
 		})
 	})
 
-	// 6. http.Server con timeouts desde config (sin paquete httpserver).
+	// 6. http.Server con timeouts desde config - Ajustado con prefijo seguro para la red TCP
+	direccionPuerto := cfg.Puerto
+	if !strings.HasPrefix(direccionPuerto, ":") {
+		direccionPuerto = ":" + direccionPuerto
+	}
+
 	srv := &http.Server{
-		Addr:         cfg.Puerto,
+		Addr:         direccionPuerto,
 		Handler:      r,
 		ReadTimeout:  cfg.ReadTimeout,
 		WriteTimeout: cfg.WriteTimeout,
@@ -167,7 +171,7 @@ func run(cfg config.Config) error {
 	// 8. Arrancar en goroutine.
 	errServidor := make(chan error, 1)
 	go func() {
-		log.Printf("Servidor Pesca-Directa Tarqui escuchando en http://localhost%s", cfg.Puerto)
+		log.Printf("Servidor Pesca-Directa Tarqui escuchando en http://localhost:%s", strings.TrimPrefix(cfg.Puerto, ":"))
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errServidor <- err
 		}
