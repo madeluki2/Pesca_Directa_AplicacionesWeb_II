@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -28,10 +29,15 @@ func Nuevo(handler http.Handler, opts ...Opcion) *Servidor {
 	return s
 }
 
-// ConPuerto cambia el puerto del servidor.
+// ConPuerto cambia el puerto del servidor de forma segura.
 func ConPuerto(puerto string) Opcion {
 	return func(s *Servidor) {
-		s.srv.Addr = ":" + puerto
+		// Si el puerto ya viene con ":", lo asigna directo; si viene plano "8080", se lo agrega.
+		if strings.HasPrefix(puerto, ":") {
+			s.srv.Addr = puerto
+		} else {
+			s.srv.Addr = ":" + puerto
+		}
 	}
 }
 
