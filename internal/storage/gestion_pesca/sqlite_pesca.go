@@ -1,4 +1,4 @@
-package storage
+package gestion_pesca
 
 import (
 	"gorm.io/gorm"

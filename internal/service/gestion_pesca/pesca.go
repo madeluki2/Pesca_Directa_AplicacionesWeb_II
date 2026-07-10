@@ -1,10 +1,10 @@
-package service
+package gestion_pesca
 
 import (
 	"strings"
 
 	"Pesca_Directa_AplicacionesWeb_II/internal/models"
-	"Pesca_Directa_AplicacionesWeb_II/internal/storage"
+	storage "Pesca_Directa_AplicacionesWeb_II/internal/storage/gestion_pesca"
 )
 
 // PescaService concentra toda la lógica de negocio del módulo.

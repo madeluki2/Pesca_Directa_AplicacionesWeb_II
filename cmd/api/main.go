@@ -15,8 +15,10 @@ import (
 
 	"Pesca_Directa_AplicacionesWeb_II/internal/config"
 	"Pesca_Directa_AplicacionesWeb_II/internal/handlers"
+	pescaHandlers "Pesca_Directa_AplicacionesWeb_II/internal/handlers/gestion_pesca"
 	"Pesca_Directa_AplicacionesWeb_II/internal/middleware"
 	"Pesca_Directa_AplicacionesWeb_II/internal/service"
+	pescaService "Pesca_Directa_AplicacionesWeb_II/internal/service/gestion_pesca"
 	"Pesca_Directa_AplicacionesWeb_II/internal/storage"
 )
 
@@ -40,17 +42,17 @@ func run(cfg config.Config) error {
 	//    Cuando se aplique el refactor de Options, esta línea cambia a:
 	//    service.NewAuthService(recursos.Usuarios, service.WithSecreto(cfg.JWTSecreto), ...)
 	authService := service.NewAuthService(recursos.Usuarios)
-	pescaService := service.NewPescaService(recursos.Pesca)
+	pescaSvc := pescaService.NewPescaService(recursos.Pesca)
 	pedidoService := service.NewPedidoService(recursos.Pedidos)
 	rutasService := service.NewRutasService(recursos.Rutas)
 
 	// 3. Server con Deps.
 	servidor := handlers.NewServer(handlers.Deps{
-		Pesca:   pescaService,
 		Pedidos: pedidoService,
 		Rutas:   rutasService,
 		Auth:    authService,
 	})
+	servidorPesca := pescaHandlers.NewServer(pescaHandlers.Deps{Pesca: pescaSvc})
 
 	// 4. Router + middlewares.
 	r := chi.NewRouter()
@@ -67,41 +69,41 @@ func run(cfg config.Config) error {
 			r.Use(middleware.Auth(authService))
 
 			// ── Anthony: Gestión de Pesca ─────────────────────────────
-			r.Get("/pescadores", servidor.ListarPescadores)
-			r.Post("/pescadores", servidor.CrearPescador)
-			r.Get("/pescadores/{id}", servidor.ObtenerPescador)
-			r.Put("/pescadores/{id}", servidor.ActualizarPescador)
-			r.Delete("/pescadores/{id}", servidor.BorrarPescador)
+			r.Get("/pescadores", servidorPesca.ListarPescadores)
+			r.Post("/pescadores", servidorPesca.CrearPescador)
+			r.Get("/pescadores/{id}", servidorPesca.ObtenerPescador)
+			r.Put("/pescadores/{id}", servidorPesca.ActualizarPescador)
+			r.Delete("/pescadores/{id}", servidorPesca.BorrarPescador)
 
-			r.Get("/embarcaciones", servidor.ListarEmbarcaciones)
-			r.Post("/embarcaciones", servidor.CrearEmbarcacion)
-			r.Get("/embarcaciones/{id}", servidor.ObtenerEmbarcacion)
-			r.Put("/embarcaciones/{id}", servidor.ActualizarEmbarcacion)
-			r.Delete("/embarcaciones/{id}", servidor.BorrarEmbarcacion)
+			r.Get("/embarcaciones", servidorPesca.ListarEmbarcaciones)
+			r.Post("/embarcaciones", servidorPesca.CrearEmbarcacion)
+			r.Get("/embarcaciones/{id}", servidorPesca.ObtenerEmbarcacion)
+			r.Put("/embarcaciones/{id}", servidorPesca.ActualizarEmbarcacion)
+			r.Delete("/embarcaciones/{id}", servidorPesca.BorrarEmbarcacion)
 
-			r.Get("/especies", servidor.ListarEspecies)
-			r.Post("/especies", servidor.CrearEspecie)
-			r.Get("/especies/{id}", servidor.ObtenerEspecie)
-			r.Put("/especies/{id}", servidor.ActualizarEspecie)
-			r.Delete("/especies/{id}", servidor.BorrarEspecie)
+			r.Get("/especies", servidorPesca.ListarEspecies)
+			r.Post("/especies", servidorPesca.CrearEspecie)
+			r.Get("/especies/{id}", servidorPesca.ObtenerEspecie)
+			r.Put("/especies/{id}", servidorPesca.ActualizarEspecie)
+			r.Delete("/especies/{id}", servidorPesca.BorrarEspecie)
 
-			r.Get("/capturas", servidor.ListarCapturas)
-			r.Post("/capturas", servidor.CrearCaptura)
-			r.Get("/capturas/{id}", servidor.ObtenerCaptura)
-			r.Put("/capturas/{id}", servidor.ActualizarCaptura)
-			r.Delete("/capturas/{id}", servidor.BorrarCaptura)
+			r.Get("/capturas", servidorPesca.ListarCapturas)
+			r.Post("/capturas", servidorPesca.CrearCaptura)
+			r.Get("/capturas/{id}", servidorPesca.ObtenerCaptura)
+			r.Put("/capturas/{id}", servidorPesca.ActualizarCaptura)
+			r.Delete("/capturas/{id}", servidorPesca.BorrarCaptura)
 
-			r.Get("/bodegas", servidor.ListarBodegas)
-			r.Post("/bodegas", servidor.CrearBodega)
-			r.Get("/bodegas/{id}", servidor.ObtenerBodega)
-			r.Put("/bodegas/{id}", servidor.ActualizarBodega)
-			r.Delete("/bodegas/{id}", servidor.BorrarBodega)
+			r.Get("/bodegas", servidorPesca.ListarBodegas)
+			r.Post("/bodegas", servidorPesca.CrearBodega)
+			r.Get("/bodegas/{id}", servidorPesca.ObtenerBodega)
+			r.Put("/bodegas/{id}", servidorPesca.ActualizarBodega)
+			r.Delete("/bodegas/{id}", servidorPesca.BorrarBodega)
 
-			r.Get("/stocks", servidor.ListarStocks)
-			r.Post("/stocks", servidor.CrearStock)
-			r.Get("/stocks/{id}", servidor.ObtenerStock)
-			r.Put("/stocks/{id}", servidor.ActualizarStock)
-			r.Delete("/stocks/{id}", servidor.BorrarStock)
+			r.Get("/stocks", servidorPesca.ListarStocks)
+			r.Post("/stocks", servidorPesca.CrearStock)
+			r.Get("/stocks/{id}", servidorPesca.ObtenerStock)
+			r.Put("/stocks/{id}", servidorPesca.ActualizarStock)
+			r.Delete("/stocks/{id}", servidorPesca.BorrarStock)
 
 			// ── Ilaria: Gestión de Pedidos ────────────────────────────
 			r.Get("/clientes", servidor.ListarClientes)

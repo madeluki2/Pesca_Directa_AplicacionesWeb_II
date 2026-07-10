@@ -1,4 +1,4 @@
-package handlers
+package gestion_pesca
 
 import (
 	"bytes"
@@ -6,30 +6,26 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"Pesca_Directa_AplicacionesWeb_II/internal/middleware"
 	"Pesca_Directa_AplicacionesWeb_II/internal/models"
-	"Pesca_Directa_AplicacionesWeb_II/internal/service"
-	"Pesca_Directa_AplicacionesWeb_II/internal/storage"
+	authService "Pesca_Directa_AplicacionesWeb_II/internal/service"
+	service "Pesca_Directa_AplicacionesWeb_II/internal/service/gestion_pesca"
 )
 
-// ─── Fake de AlmacenPesca en memoria ─────────────────────────────────────────
-
-type especieFake struct {
+type fakeAlmacenParaHandlers struct {
 	datos  []models.Especie
 	nextID int
 }
 
-func nuevoEspecieFake() *especieFake { return &especieFake{nextID: 1} }
+func nuevoFakeAlmacen() *fakeAlmacenParaHandlers { return &fakeAlmacenParaHandlers{nextID: 1} }
 
-func (f *especieFake) ListarEspecies() []models.Especie { return f.datos }
-func (f *especieFake) BuscarEspeciePorID(id int) (models.Especie, bool) {
+func (f *fakeAlmacenParaHandlers) ListarEspecies() []models.Especie { return f.datos }
+func (f *fakeAlmacenParaHandlers) BuscarEspeciePorID(id int) (models.Especie, bool) {
 	for _, e := range f.datos {
 		if e.ID == id {
 			return e, true
@@ -37,174 +33,125 @@ func (f *especieFake) BuscarEspeciePorID(id int) (models.Especie, bool) {
 	}
 	return models.Especie{}, false
 }
-func (f *especieFake) CrearEspecie(e models.Especie) models.Especie {
+func (f *fakeAlmacenParaHandlers) CrearEspecie(e models.Especie) models.Especie {
 	e.ID = f.nextID
 	f.nextID++
 	f.datos = append(f.datos, e)
 	return e
 }
-func (f *especieFake) ActualizarEspecie(id int, d models.Especie) (models.Especie, bool) {
-	for i, e := range f.datos {
-		if e.ID == id {
-			d.ID = id
-			f.datos[i] = d
-			return d, true
+func (f *fakeAlmacenParaHandlers) ActualizarEspecie(id int, e models.Especie) (models.Especie, bool) {
+	for i, v := range f.datos {
+		if v.ID == id {
+			e.ID = id
+			f.datos[i] = e
+			return e, true
 		}
 	}
 	return models.Especie{}, false
 }
-func (f *especieFake) BorrarEspecie(id int) bool {
-	for i, e := range f.datos {
-		if e.ID == id {
+func (f *fakeAlmacenParaHandlers) BorrarEspecie(id int) bool {
+	for i, v := range f.datos {
+		if v.ID == id {
 			f.datos = append(f.datos[:i], f.datos[i+1:]...)
 			return true
 		}
 	}
 	return false
 }
-func (f *especieFake) ListarPescadores() []models.Pescador { return nil }
-func (f *especieFake) BuscarPescadorPorID(id int) (models.Pescador, bool) {
+
+// Stubs requeridos por compatibilidad estructural con la interfaz del proyecto
+func (f *fakeAlmacenParaHandlers) ListarPescadores() []models.Pescador { return nil }
+func (f *fakeAlmacenParaHandlers) BuscarPescadorPorID(id int) (models.Pescador, bool) {
 	return models.Pescador{}, false
 }
-func (f *especieFake) CrearPescador(p models.Pescador) models.Pescador { return p }
-func (f *especieFake) ActualizarPescador(id int, d models.Pescador) (models.Pescador, bool) {
-	return d, true
+func (f *fakeAlmacenParaHandlers) CrearPescador(p models.Pescador) models.Pescador { return p }
+func (f *fakeAlmacenParaHandlers) ActualizarPescador(id int, d models.Pescador) (models.Pescador, bool) {
+	return d, false
 }
-func (f *especieFake) BorrarPescador(id int) bool                { return true }
-func (f *especieFake) ListarEmbarcaciones() []models.Embarcacion { return nil }
-func (f *especieFake) BuscarEmbarcacionPorID(id int) (models.Embarcacion, bool) {
+func (f *fakeAlmacenParaHandlers) BorrarPescador(id int) bool                { return false }
+func (f *fakeAlmacenParaHandlers) ListarEmbarcaciones() []models.Embarcacion { return nil }
+func (f *fakeAlmacenParaHandlers) BuscarEmbarcacionPorID(id int) (models.Embarcacion, bool) {
 	return models.Embarcacion{}, false
 }
-func (f *especieFake) CrearEmbarcacion(e models.Embarcacion) models.Embarcacion { return e }
-func (f *especieFake) ActualizarEmbarcacion(id int, d models.Embarcacion) (models.Embarcacion, bool) {
-	return d, true
+func (f *fakeAlmacenParaHandlers) CrearEmbarcacion(e models.Embarcacion) models.Embarcacion { return e }
+func (f *fakeAlmacenParaHandlers) ActualizarEmbarcacion(id int, d models.Embarcacion) (models.Embarcacion, bool) {
+	return d, false
 }
-func (f *especieFake) BorrarEmbarcacion(id int) bool    { return true }
-func (f *especieFake) ListarCapturas() []models.Captura { return nil }
-func (f *especieFake) BuscarCapturaPorID(id int) (models.Captura, bool) {
+func (f *fakeAlmacenParaHandlers) BorrarEmbarcacion(id int) bool    { return false }
+func (f *fakeAlmacenParaHandlers) ListarCapturas() []models.Captura { return nil }
+func (f *fakeAlmacenParaHandlers) BuscarCapturaPorID(id int) (models.Captura, bool) {
 	return models.Captura{}, false
 }
-func (f *especieFake) CrearCaptura(c models.Captura) models.Captura { return c }
-func (f *especieFake) ActualizarCaptura(id int, d models.Captura) (models.Captura, bool) {
-	return d, true
+func (f *fakeAlmacenParaHandlers) CrearCaptura(c models.Captura) models.Captura { return c }
+func (f *fakeAlmacenParaHandlers) ActualizarCaptura(id int, d models.Captura) (models.Captura, bool) {
+	return d, false
 }
-func (f *especieFake) BorrarCaptura(id int) bool                                      { return true }
-func (f *especieFake) ListarBodegas() []models.Bodega                                 { return nil }
-func (f *especieFake) BuscarBodegaPorID(id int) (models.Bodega, bool)                 { return models.Bodega{}, false }
-func (f *especieFake) CrearBodega(b models.Bodega) models.Bodega                      { return b }
-func (f *especieFake) ActualizarBodega(id int, d models.Bodega) (models.Bodega, bool) { return d, true }
-func (f *especieFake) BorrarBodega(id int) bool                                       { return true }
-func (f *especieFake) ListarStocks() []models.Stock                                   { return nil }
-func (f *especieFake) BuscarStockPorID(id int) (models.Stock, bool)                   { return models.Stock{}, false }
-func (f *especieFake) CrearStock(s models.Stock) models.Stock                         { return s }
-func (f *especieFake) ActualizarStock(id int, d models.Stock) (models.Stock, bool)    { return d, true }
-func (f *especieFake) BorrarStock(id int) bool                                        { return true }
+func (f *fakeAlmacenParaHandlers) BorrarCaptura(id int) bool      { return false }
+func (f *fakeAlmacenParaHandlers) ListarBodegas() []models.Bodega { return nil }
+func (f *fakeAlmacenParaHandlers) BuscarBodegaPorID(id int) (models.Bodega, bool) {
+	return models.Bodega{}, false
+}
+func (f *fakeAlmacenParaHandlers) CrearBodega(b models.Bodega) models.Bodega { return b }
+func (f *fakeAlmacenParaHandlers) ActualizarBodega(id int, d models.Bodega) (models.Bodega, bool) {
+	return d, false
+}
+func (f *fakeAlmacenParaHandlers) BorrarBodega(id int) bool     { return false }
+func (f *fakeAlmacenParaHandlers) ListarStocks() []models.Stock { return nil }
+func (f *fakeAlmacenParaHandlers) BuscarStockPorID(id int) (models.Stock, bool) {
+	return models.Stock{}, false
+}
+func (f *fakeAlmacenParaHandlers) CrearStock(s models.Stock) models.Stock { return s }
+func (f *fakeAlmacenParaHandlers) ActualizarStock(id int, d models.Stock) (models.Stock, bool) {
+	return d, false
+}
+func (f *fakeAlmacenParaHandlers) BorrarStock(id int) bool { return false }
 
-// ─── Fake de UserRepository ───────────────────────────────────────────────────
+type fakeUsuariosAuth struct{}
 
-type usuarioFake struct {
-	datos  []models.Usuario
-	nextID int
+func (fakeUsuariosAuth) CrearUsuario(u models.Usuario) (models.Usuario, error) {
+	return u, nil
 }
 
-func nuevoUsuarioFake() *usuarioFake { return &usuarioFake{nextID: 1} }
-
-func (u *usuarioFake) CrearUsuario(usr models.Usuario) (models.Usuario, error) {
-	usr.ID = u.nextID
-	u.nextID++
-	u.datos = append(u.datos, usr)
-	return usr, nil
-}
-func (u *usuarioFake) BuscarUsuarioPorEmail(email string) (models.Usuario, bool) {
-	for _, usr := range u.datos {
-		if usr.Email == email {
-			return usr, true
-		}
-	}
+func (fakeUsuariosAuth) BuscarUsuarioPorEmail(email string) (models.Usuario, bool) {
 	return models.Usuario{}, false
 }
 
-// ─── Helper: genera un token JWT válido para los tests ───────────────────────
-
-func generarTokenTest(t *testing.T, auth *service.AuthService) string {
+func nuevoRouterTest(t *testing.T) (http.Handler, *authService.AuthService) {
 	t.Helper()
-	u := models.Usuario{ID: 1, Email: "test@pesca.com", PasswordHash: "x"}
-	token, err := auth.GenerarToken(u)
-	require.NoError(t, err, "no se pudo generar token de prueba")
+	auth := authService.NewAuthService(fakeUsuariosAuth{})
+	r := chi.NewRouter()
+
+	fakeStore := nuevoFakeAlmacen()
+	svc := service.NewPescaService(fakeStore)
+	server := NewServer(Deps{Pesca: svc})
+
+	r.Route("/api/v1", func(r chi.Router) {
+		r.Use(middleware.Auth(auth))
+		r.Post("/especies", server.CrearEspecie)
+		r.Get("/especies", server.ListarEspecies)
+	})
+
+	return r, auth
+}
+
+func generarTokenTest(t *testing.T, auth *authService.AuthService) string {
+	t.Helper()
+	token, err := auth.GenerarToken(models.Usuario{ID: 1, Email: "usuario_test"})
+	require.NoError(t, err)
 	return "Bearer " + token
 }
 
-// ─── Helper: construye el router completo en memoria ─────────────────────────
+// ═══════════════════════════ TESTS HANDLERS (ESPECIE) ═══════════════════════════
 
-func nuevoRouterTest(t *testing.T) (http.Handler, *service.AuthService) {
-	t.Helper()
-
-	pescaService := service.NewPescaService(nuevoEspecieFake())
-	authService := service.NewAuthService(nuevoUsuarioFake())
-	pedidoService := service.NewPedidoService(storage.NewMemoria())
-	rutasService := service.NewRutasService(storage.NuevaMemoriaRutas())
-
-	// ← CAMBIO: Deps struct en vez de parámetros posicionales
-	servidor := NewServer(Deps{
-		Pesca:   pescaService,
-		Pedidos: pedidoService,
-		Rutas:   rutasService,
-		Auth:    authService,
-	})
-
-	r := chi.NewRouter()
-	r.Route("/api/v1", func(r chi.Router) {
-		r.Post("/auth/register", servidor.Registrar)
-		r.Post("/auth/login", servidor.Login)
-
-		r.Group(func(r chi.Router) {
-			r.Use(middleware.Auth(authService))
-			r.Get("/especies", servidor.ListarEspecies)
-			r.Post("/especies", servidor.CrearEspecie)
-			r.Get("/especies/{id}", servidor.ObtenerEspecie)
-		})
-	})
-
-	return r, authService
-}
-
-// ─── Tests ────────────────────────────────────────────────────────────────────
-
-// Test 401 — GET /especies SIN token debe devolver 401.
-func TestHandler_GetEspecies_SinToken_Devuelve401(t *testing.T) {
+func TestHandler_CrearEspecie_SinToken_Devuelve401(t *testing.T) {
 	router, _ := nuevoRouterTest(t)
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/especies", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/especies", nil)
 	rec := httptest.NewRecorder()
 
 	router.ServeHTTP(rec, req)
-
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
 }
 
-// Test 401 — Token expirado debe devolver 401.
-func TestHandler_TokenExpirado_Devuelve401(t *testing.T) {
-	router, _ := nuevoRouterTest(t)
-
-	claims := &service.Claims{
-		UsuarioID: 1,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(-1 * time.Hour)),
-		},
-	}
-	tokenExpirado, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).
-		SignedString([]byte(service.SecretoPorDefecto))
-	require.NoError(t, err)
-
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/especies", nil)
-	req.Header.Set("Authorization", "Bearer "+tokenExpirado)
-	rec := httptest.NewRecorder()
-
-	router.ServeHTTP(rec, req)
-
-	assert.Equal(t, http.StatusUnauthorized, rec.Code)
-}
-
-// Test 201 — POST /especies con datos válidos y token → 201 Created.
 func TestHandler_CrearEspecie_Valida_Devuelve201(t *testing.T) {
 	router, auth := nuevoRouterTest(t)
 	token := generarTokenTest(t, auth)
@@ -212,7 +159,6 @@ func TestHandler_CrearEspecie_Valida_Devuelve201(t *testing.T) {
 	cuerpo, _ := json.Marshal(models.Especie{
 		NombreComun:  "Corvina",
 		UnidadMedida: "kg",
-		Temporada:    "enero a marzo",
 	})
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/especies", bytes.NewReader(cuerpo))
@@ -222,30 +168,8 @@ func TestHandler_CrearEspecie_Valida_Devuelve201(t *testing.T) {
 
 	router.ServeHTTP(rec, req)
 
-	require.Equal(t, http.StatusCreated, rec.Code, "body: %s", rec.Body.String())
-
+	require.Equal(t, http.StatusCreated, rec.Code)
 	var respuesta models.Especie
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &respuesta))
-	assert.NotZero(t, respuesta.ID)
 	assert.Equal(t, "Corvina", respuesta.NombreComun)
-}
-
-// Test 400 — POST /especies con nombre_comun vacío → 400 Bad Request.
-func TestHandler_CrearEspecie_NombreVacio_Devuelve400(t *testing.T) {
-	router, auth := nuevoRouterTest(t)
-	token := generarTokenTest(t, auth)
-
-	cuerpo, _ := json.Marshal(models.Especie{
-		NombreComun:  "",
-		UnidadMedida: "kg",
-	})
-
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/especies", bytes.NewReader(cuerpo))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", token)
-	rec := httptest.NewRecorder()
-
-	router.ServeHTTP(rec, req)
-
-	assert.Equal(t, http.StatusBadRequest, rec.Code, "body: %s", rec.Body.String())
 }

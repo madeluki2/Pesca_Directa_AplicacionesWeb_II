@@ -6,7 +6,6 @@ import (
 
 // Deps agrupa todas las dependencias que los handlers necesitan.
 type Deps struct {
-	Pesca   *service.PescaService
 	Pedidos *service.PedidoService
 	Rutas   *service.RutasService
 	Auth    *service.AuthService
@@ -14,7 +13,6 @@ type Deps struct {
 
 // Server es el punto único de entrada a todos los handlers.
 type Server struct {
-	Pesca   *service.PescaService
 	Pedidos *service.PedidoService
 	Rutas   *service.RutasService
 	Auth    *service.AuthService
@@ -23,7 +21,6 @@ type Server struct {
 // NewServer crea el servidor con todas las dependencias inyectadas.
 func NewServer(deps Deps) *Server {
 	return &Server{
-		Pesca:   deps.Pesca,
 		Pedidos: deps.Pedidos,
 		Rutas:   deps.Rutas,
 		Auth:    deps.Auth,

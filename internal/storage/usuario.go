@@ -8,6 +8,11 @@ import (
 	"Pesca_Directa_AplicacionesWeb_II/internal/models"
 )
 
+type UserRepository interface {
+	CrearUsuario(u models.Usuario) (models.Usuario, error)
+	BuscarUsuarioPorEmail(email string) (models.Usuario, bool)
+}
+
 // UsuarioGORM implementa UserRepository usando GORM sobre SQLite.
 type UsuarioGORM struct {
 	db *gorm.DB
@@ -32,3 +37,5 @@ func (r *UsuarioGORM) BuscarUsuarioPorEmail(email string) (models.Usuario, bool)
 	}
 	return u, true
 }
+
+var _ UserRepository = (*UsuarioGORM)(nil)
