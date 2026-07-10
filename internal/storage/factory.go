@@ -11,32 +11,15 @@ import (
 
 	"Pesca_Directa_AplicacionesWeb_II/internal/models"
 	pedidosStorage "Pesca_Directa_AplicacionesWeb_II/internal/storage/gestion_pedidos"
-<<<<<<< HEAD
-<<<<<<< HEAD
 	pescaStorage "Pesca_Directa_AplicacionesWeb_II/internal/storage/gestion_pesca"
 	rutasStorage "Pesca_Directa_AplicacionesWeb_II/internal/storage/rutas_de_distribucion"
-=======
->>>>>>> a7d7cf21cfe890d3e243c29e2cce8961e9021327
-=======
-	pescaStorage "Pesca_Directa_AplicacionesWeb_II/internal/storage/gestion_pesca"
->>>>>>> 5350001560abd8ae5ce9a208a676c9635fbff78d
 )
 
-// Recursos agrupa los almacenes de los modulos y el repositorio compartido de usuarios.
+// Recursos agrupa los almacenes de los módulos y el repositorio compartido de usuarios.
 type Recursos struct {
-<<<<<<< HEAD
-<<<<<<< HEAD
 	Pesca        pescaStorage.AlmacenPesca
 	Pedidos      pedidosStorage.Almacen
 	Rutas        rutasStorage.AlmacenRutas
-=======
-	Pesca        AlmacenPesca
-=======
-	Pesca        pescaStorage.AlmacenPesca
->>>>>>> 5350001560abd8ae5ce9a208a676c9635fbff78d
-	Pedidos      pedidosStorage.Almacen
-	Rutas        AlmacenRutas
->>>>>>> a7d7cf21cfe890d3e243c29e2cce8961e9021327
 	Usuarios     UserRepository
 	BackendUsado string
 	Cerrar       func() error
@@ -68,33 +51,20 @@ func Inicializar(driver, dsn, rutaDB, backend string) (*Recursos, error) {
 		return nil, fmt.Errorf("AutoMigrate: %w", err)
 	}
 
-<<<<<<< HEAD
-<<<<<<< HEAD
 	var almacenRutas rutasStorage.AlmacenRutas
+	var almacenPesca pescaStorage.AlmacenPesca
+	var almacenPedidos pedidosStorage.Almacen
 	backendUsado := "gorm"
 
 	if backend == "memoria" {
 		almacenRutas = rutasStorage.NuevaMemoriaRutas()
+		almacenPesca = pescaStorage.NuevaMemoriaPesca()
+		almacenPedidos = pedidosStorage.NuevoAlmacenSQLite(gdb)
 		backendUsado = "memoria"
 	} else {
 		almacenRutas = rutasStorage.NuevoAlmacenSQLiteRutas(gdb)
-=======
-	var almacenRutas AlmacenRutas
-	var almacenPesca AlmacenPesca
-=======
->>>>>>> 5350001560abd8ae5ce9a208a676c9635fbff78d
-	backendUsado := "gorm"
-	almacenRutas := AlmacenRutas(NuevoAlmacenSQLiteRutas(gdb))
-	if backend == "memoria" {
-		almacenRutas = NuevaMemoriaRutas()
-		backendUsado = "memoria"
-<<<<<<< HEAD
-	} else {
-		almacenRutas = NuevoAlmacenSQLiteRutas(gdb)
-		almacenPesca = NuevoAlmacenSQLitePesca(gdb)
->>>>>>> a7d7cf21cfe890d3e243c29e2cce8961e9021327
-=======
->>>>>>> 5350001560abd8ae5ce9a208a676c9635fbff78d
+		almacenPesca = pescaStorage.NuevoAlmacenPesca(gdb, backend)
+		almacenPedidos = pedidosStorage.NuevoAlmacenSQLite(gdb)
 	}
 
 	cerrar := func() error {
@@ -106,17 +76,8 @@ func Inicializar(driver, dsn, rutaDB, backend string) (*Recursos, error) {
 	}
 
 	return &Recursos{
-<<<<<<< HEAD
-<<<<<<< HEAD
-		Pesca:        pescaStorage.NuevoAlmacenPesca(gdb, backend),
-=======
 		Pesca:        almacenPesca,
->>>>>>> a7d7cf21cfe890d3e243c29e2cce8961e9021327
 		Pedidos:      almacenPedidos,
-=======
-		Pesca:        pescaStorage.NuevoAlmacenPesca(gdb, backend),
-		Pedidos:      pedidosStorage.NuevoAlmacenSQLite(gdb),
->>>>>>> 5350001560abd8ae5ce9a208a676c9635fbff78d
 		Rutas:        almacenRutas,
 		Usuarios:     NewUsuarioGORM(gdb),
 		BackendUsado: backendUsado,
@@ -134,7 +95,7 @@ func abrirGorm(driver, dsn, rutaDB string) (*gorm.DB, error) {
 			if err == nil {
 				return gdb, nil
 			}
-			log.Printf("PostgreSQL no esta listo (intento %d/10): %v", intento, err)
+			log.Printf("PostgreSQL no está listo (intento %d/10): %v", intento, err)
 			time.Sleep(2 * time.Second)
 		}
 		return nil, fmt.Errorf("conectar a PostgreSQL tras reintentos: %w", err)

@@ -1,8 +1,4 @@
-<<<<<<<< HEAD:internal/handlers/rutas_de_distribucion/auth.go
-package rutas_de_distribucion
-========
 package gestion_pedidos
->>>>>>>> a7d7cf21cfe890d3e243c29e2cce8961e9021327:internal/handlers/gestion_pedidos/auth.go
 
 import (
 	"encoding/json"
