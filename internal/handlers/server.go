@@ -2,23 +2,27 @@ package handlers
 
 import (
 	"Pesca_Directa_AplicacionesWeb_II/internal/service"
+	gestion_pedidos "Pesca_Directa_AplicacionesWeb_II/internal/service/gestion_pedidos"
+	rutas_de_distribucion "Pesca_Directa_AplicacionesWeb_II/internal/service/rutas_de_distribucion"
 )
 
-// Server agrupa los tres services del proyecto.
-// Los handlers nunca dependen del storage directamente —
-// solo conocen los services que reciben aquí.
 type Server struct {
-	Pesca   *service.PescaService  // Anthony  — Gestión de Pesca
-	Pedidos *service.PedidoService // Ilaria   — Gestión de Pedidos
+	Pesca   *service.PescaService
+	Pedidos *gestion_pedidos.PedidoService
+	Rutas   *rutas_de_distribucion.RutasService
+	Auth    *service.AuthService
 }
 
-// NewServer crea el servidor con todos los services inyectados.
 func NewServer(
 	pesca *service.PescaService,
-	pedidos *service.PedidoService,
+	pedidos *gestion_pedidos.PedidoService,
+	rutas *rutas_de_distribucion.RutasService,
+	auth *service.AuthService,
 ) *Server {
 	return &Server{
 		Pesca:   pesca,
 		Pedidos: pedidos,
+		Rutas:   rutas,
+		Auth:    auth,
 	}
 }

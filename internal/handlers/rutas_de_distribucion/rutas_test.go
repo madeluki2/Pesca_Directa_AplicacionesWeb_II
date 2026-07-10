@@ -81,8 +81,6 @@ func nuevoRouterTestRutas(t *testing.T) (http.Handler, *AuthService) {
 
 	r := chi.NewRouter()
 	r.Route("/api/v1", func(r chi.Router) {
-		r.Post("/auth/register", servidor.Registrar)
-		r.Post("/auth/login", servidor.Login)
 
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.Auth(authService))

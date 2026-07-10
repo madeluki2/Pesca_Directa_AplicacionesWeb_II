@@ -1,10 +1,8 @@
-package rutas_de_distribucion
+package handlers
 
 import (
 	"encoding/json"
 	"net/http"
-
-	. "Pesca_Directa_AplicacionesWeb_II/internal/handlers"
 )
 
 // credenciales es el body que reciben Registrar y Login.
@@ -14,7 +12,7 @@ type credenciales struct {
 }
 
 // Registrar atiende POST /api/v1/auth/register
-func (s *Server0) Registrar(w http.ResponseWriter, r *http.Request) {
+func (s *Server) Registrar(w http.ResponseWriter, r *http.Request) {
 	var creds credenciales
 	if err := json.NewDecoder(r.Body).Decode(&creds); err != nil {
 		RespondError(w, http.StatusBadRequest, "JSON inválido: "+err.Error())
@@ -23,7 +21,7 @@ func (s *Server0) Registrar(w http.ResponseWriter, r *http.Request) {
 
 	usuario, err := s.Auth.Registrar(creds.Email, creds.Password)
 	if err != nil {
-		RespondError(w, statusDeError(err), err.Error())
+		RespondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -31,7 +29,7 @@ func (s *Server0) Registrar(w http.ResponseWriter, r *http.Request) {
 }
 
 // Login atiende POST /api/v1/auth/login
-func (s *Server0) Login(w http.ResponseWriter, r *http.Request) {
+func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
 	var creds credenciales
 	if err := json.NewDecoder(r.Body).Decode(&creds); err != nil {
 		RespondError(w, http.StatusBadRequest, "JSON inválido: "+err.Error())
@@ -40,7 +38,7 @@ func (s *Server0) Login(w http.ResponseWriter, r *http.Request) {
 
 	token, err := s.Auth.Login(creds.Email, creds.Password)
 	if err != nil {
-		RespondError(w, statusDeError(err), err.Error())
+		RespondError(w, http.StatusUnauthorized, err.Error())
 		return
 	}
 
