@@ -1,28 +1,33 @@
 package handlers
 
 import (
+	"net/http"
+
 	"Pesca_Directa_AplicacionesWeb_II/internal/service"
 )
 
-// Deps agrupa todas las dependencias que los handlers necesitan.
-type Deps struct {
-	Pedidos *service.PedidoService
-	Rutas   *service.RutasService
-	Auth    *service.AuthService
-}
-
-// Server es el punto único de entrada a todos los handlers.
+// Server expone los handlers del paquete raiz.
 type Server struct {
-	Pedidos *service.PedidoService
-	Rutas   *service.RutasService
-	Auth    *service.AuthService
+	Rutas *service.RutasService
 }
 
-// NewServer crea el servidor con todas las dependencias inyectadas.
-func NewServer(deps Deps) *Server {
+// Deps agrupa los servicios requeridos por los handlers de rutas.
+type Deps struct {
+	Rutas *service.RutasService
+}
+
+// NewServer inicializa el controlador de rutas de distribucion.
+func NewServer(d Deps) *Server {
 	return &Server{
-		Pedidos: deps.Pedidos,
-		Rutas:   deps.Rutas,
-		Auth:    deps.Auth,
+		Rutas: d.Rutas,
 	}
+}
+
+// BaseHandler es un ping de sanidad para verificar la disponibilidad de la API.
+func (s *Server) BaseHandler(w http.ResponseWriter, r *http.Request) {
+	RespondJSON(w, http.StatusOK, map[string]string{
+		"app":     "Pesca-Directa Tarqui API",
+		"status":  "running",
+		"version": "1.0.0",
+	})
 }

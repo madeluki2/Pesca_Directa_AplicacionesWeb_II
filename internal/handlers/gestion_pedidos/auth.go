@@ -1,4 +1,4 @@
-package handlers
+package gestion_pedidos
 
 import (
 	"encoding/json"

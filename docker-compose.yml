@@ -1,8 +1,7 @@
-# Orquesta dos servicios: la API (que construimos con el Dockerfile) y una base
-# PostgreSQL. La API espera a que la base esté "healthy" antes de arrancar.
 services:
   db:
     image: postgres:16-alpine
+    container_name: pesca-postgres-db
     environment:
       POSTGRES_USER: pesca
       POSTGRES_PASSWORD: pesca
@@ -10,31 +9,30 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      # Volumen nombrado: los datos sobreviven a "docker compose down" (sin -v).
-      - dbdata:/var/lib/postgresql/data
+      - postgres_pesca_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U pesca -d pesca_directa"]
       interval: 5s
-      timeout: 3s
+      timeout: 5s
       retries: 10
 
   api:
     build: .
+    container_name: pesca-directa-api
     environment:
-      PUERTO: ":8080"
-      # En el contenedor usamos PostgreSQL.
-      # El host "db" es el nombre del servicio de arriba:
-      # docker compose lo resuelve por DNS interno.
-      DB_DRIVER: postgres
-      DB_DSN: "host=db user=pesca password=pesca dbname=pesca_directa port=5432 sslmode=disable TimeZone=America/Guayaquil"
-      JWT_SECRETO: "cambia-esto-en-produccion"
+      PUERTO: "8080"
+      STORAGE: "postgres"
+      RUTA_DB: "/app/data/pesca.db"
+      JWT_SECRETO: "cambia-esto-en-produccion-con-valor-largo-y-secreto"
       JWT_DURACION: "24h"
-      STORAGE: gorm
     ports:
       - "8080:8080"
+    volumes:
+      - dbdata:/app/data
     depends_on:
       db:
         condition: service_healthy
 
 volumes:
   dbdata:
+  postgres_pesca_data:

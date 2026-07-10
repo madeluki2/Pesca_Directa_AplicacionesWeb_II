@@ -1,14 +1,18 @@
-# Archivos que Docker NO debe copiar al construir la imagen.
-# Excluirlos hace el build más rápido y la imagen más limpia.
-
 .git
 .gitignore
 .env
+.vscode
+tmp
+dist
 *.db
 *.db-journal
-pesca-api
+*.exe
+*.test
 *.out
+coverage
+coverage.out
 coverage.html
+pesca-api
 README.md
 Dockerfile
 docker-compose.yml

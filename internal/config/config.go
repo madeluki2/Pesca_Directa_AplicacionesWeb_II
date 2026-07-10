@@ -1,68 +1,60 @@
-// Package config carga la configuración de Pesca-Directa Tarqui desde
-// variables de entorno (con soporte para un archivo .env opcional) y
-// expone valores por defecto razonables para desarrollo.
 package config
 
 import (
+	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/joho/godotenv"
 )
 
-// Config agrupa TODA la configuración del servidor en un solo lugar.
-//
-// Antes: el secreto JWT vivía en una var global de service/auth.go, el puerto
-// y la ruta de la DB eran literales en main.go, y el backend se leía con
-// os.Getenv suelto. Ahora hay UNA sola fuente de verdad.
+// Config agrupa toda la configuración de la aplicación.
 type Config struct {
-	Puerto       string        // puerto HTTP, ej ":8080"
-	DBDriver     string        // motor de BD: "sqlite" (default) o "postgres"
-	DBDsn        string        // DSN de PostgreSQL (solo si DBDriver="postgres")
-	RutaDB       string        // archivo SQLite, ej "pesca.db" (solo si DBDriver="sqlite")
-	Backend      string        // "gorm" (default) o "memoria"
-	JWTSecreto   []byte        // clave para firmar/verificar JWT
-	JWTDuracion  time.Duration // validez del token
-	ReadTimeout  time.Duration // timeout de lectura del servidor HTTP
-	WriteTimeout time.Duration // timeout de escritura del servidor HTTP
+	Puerto      string        // Puerto HTTP, ej: "8080"
+	RutaDB      string        // Ruta del archivo SQLite, ej: "pesca.db"
+	Storage     string        // "gorm" o "memoria"
+	JWTSecreto  string        // Clave secreta para firmar tokens JWT
+	JWTDuracion time.Duration // Duración del token, ej: 24h
 }
 
-// Cargar lee la configuración. Primero intenta cargar un archivo .env (si no
-// existe, no es un error: en producción las variables vienen del entorno real).
-// Luego lee cada variable con un valor por defecto seguro para desarrollo.
-func Cargar() Config {
-	// godotenv.Load NO sobreescribe variables ya presentes en el entorno.
-	// Si no hay .env, devuelve error que ignoramos a propósito.
+// Cargar inicializa y lee las variables de entorno del archivo .env
+func Cargar() (Config, error) {
+	// Intenta cargar el archivo .env, si no existe (como en producción con Docker) no pasa nada
 	_ = godotenv.Load()
 
-	return Config{
-		Puerto:       conTexto("PUERTO", ":8080"),
-		DBDriver:     conTexto("DB_DRIVER", "sqlite"),
-		DBDsn:        conTexto("DB_DSN", ""),
-		RutaDB:       conTexto("RUTA_DB", "pesca.db"),
-		Backend:      conTexto("STORAGE", "gorm"),
-		JWTSecreto:   []byte(conTexto("JWT_SECRETO", "pesca-directa-tarqui-secreto-solo-dev")),
-		JWTDuracion:  conDuracion("JWT_DURACION", 24*time.Hour),
-		ReadTimeout:  conDuracion("HTTP_READ_TIMEOUT", 10*time.Second),
-		WriteTimeout: conDuracion("HTTP_WRITE_TIMEOUT", 10*time.Second),
+	duracion, err := parseDuracion(getEnv("JWT_DURACION", "24h"))
+	if err != nil {
+		return Config{}, fmt.Errorf("JWT_DURACION inválida: %w", err)
 	}
+
+	return Config{
+		Puerto:      getEnv("PUERTO", "8080"),
+		RutaDB:      getEnv("RUTA_DB", "pesca.db"),
+		Storage:     getEnv("STORAGE", "gorm"),
+		JWTSecreto:  getEnv("JWT_SECRETO", "pesca-directa-tarqui-secret-2026"),
+		JWTDuracion: duracion,
+	}, nil
 }
 
-func conTexto(clave, porDefecto string) string {
+// getEnv devuelve el valor de la variable de entorno o un fallback por defecto.
+func getEnv(clave, porDefecto string) string {
 	if v := os.Getenv(clave); v != "" {
 		return v
 	}
 	return porDefecto
 }
 
-func conDuracion(clave string, porDefecto time.Duration) time.Duration {
-	v := os.Getenv(clave)
-	if v == "" {
-		return porDefecto
+// parseDuracion convierte strings como "24h" en una estructura de tiempo nativa de Go
+func parseDuracion(s string) (time.Duration, error) {
+	d, err := time.ParseDuration(s)
+	if err == nil {
+		return d, nil
 	}
-	d, err := time.ParseDuration(v)
-	if err != nil {
-		return porDefecto
+	// Intento fallback: número de horas sin unidad
+	horas, errInt := strconv.Atoi(s)
+	if errInt != nil {
+		return 0, err
 	}
-	return d
+	return time.Duration(horas) * time.Hour, nil
 }

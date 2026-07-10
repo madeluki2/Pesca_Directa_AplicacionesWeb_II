@@ -12,25 +12,19 @@ import (
 	"Pesca_Directa_AplicacionesWeb_II/internal/models"
 	pedidosStorage "Pesca_Directa_AplicacionesWeb_II/internal/storage/gestion_pedidos"
 	pescaStorage "Pesca_Directa_AplicacionesWeb_II/internal/storage/gestion_pesca"
-	rutasStorage "Pesca_Directa_AplicacionesWeb_II/internal/storage/rutas_de_distribucion"
 )
 
-// Recursos agrupa todo lo que main.go necesita para arrancar: los tres
-// almacenes (uno por módulo), el repositorio de usuarios (compartido) y
-// una función para cerrar la conexión a la base de datos limpiamente.
+// Recursos agrupa los almacenes de los modulos y el repositorio compartido de usuarios.
 type Recursos struct {
 	Pesca        pescaStorage.AlmacenPesca
 	Pedidos      pedidosStorage.Almacen
-	Rutas        rutasStorage.AlmacenRutas
+	Rutas        AlmacenRutas
 	Usuarios     UserRepository
 	BackendUsado string
 	Cerrar       func() error
 }
 
-// Inicializar abre la base de datos (sqlite en local, postgres en Docker),
-// corre AutoMigrate para TODOS los modelos de los 3 módulos, y arma los
-// almacenes correspondientes usando una única conexión *gorm.DB inyectada
-// en cada uno (Pesca, Pedidos y Rutas).
+// Inicializar abre la base de datos y construye los repositorios de pesca, pedidos y rutas.
 func Inicializar(driver, dsn, rutaDB, backend string) (*Recursos, error) {
 	gdb, err := abrirGorm(driver, dsn, rutaDB)
 	if err != nil {
@@ -56,18 +50,12 @@ func Inicializar(driver, dsn, rutaDB, backend string) (*Recursos, error) {
 		return nil, fmt.Errorf("AutoMigrate: %w", err)
 	}
 
-	var almacenRutas rutasStorage.AlmacenRutas
 	backendUsado := "gorm"
-
+	almacenRutas := AlmacenRutas(NuevoAlmacenSQLiteRutas(gdb))
 	if backend == "memoria" {
-		almacenRutas = rutasStorage.NuevaMemoriaRutas()
+		almacenRutas = NuevaMemoriaRutas()
 		backendUsado = "memoria"
-	} else {
-		almacenRutas = rutasStorage.NuevoAlmacenSQLiteRutas(gdb)
 	}
-
-	// Pedidos aún no tiene backend en memoria migrado; siempre usa GORM.
-	almacenPedidos := pedidosStorage.NuevoAlmacenSQLite(gdb)
 
 	cerrar := func() error {
 		sqlDB, err := gdb.DB()
@@ -79,7 +67,7 @@ func Inicializar(driver, dsn, rutaDB, backend string) (*Recursos, error) {
 
 	return &Recursos{
 		Pesca:        pescaStorage.NuevoAlmacenPesca(gdb, backend),
-		Pedidos:      almacenPedidos,
+		Pedidos:      pedidosStorage.NuevoAlmacenSQLite(gdb),
 		Rutas:        almacenRutas,
 		Usuarios:     NewUsuarioGORM(gdb),
 		BackendUsado: backendUsado,
