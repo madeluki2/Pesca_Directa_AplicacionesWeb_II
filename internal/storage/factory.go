@@ -11,17 +11,15 @@ import (
 
 	"Pesca_Directa_AplicacionesWeb_II/internal/models"
 	pedidosStorage "Pesca_Directa_AplicacionesWeb_II/internal/storage/gestion_pedidos"
-	pescaStorage "Pesca_Directa_AplicacionesWeb_II/internal/storage/gestion_pesca"
-	rutasStorage "Pesca_Directa_AplicacionesWeb_II/internal/storage/rutas_de_distribucion"
 )
 
 // Recursos agrupa todo lo que main.go necesita para arrancar: los tres
 // almacenes (uno por módulo), el repositorio de usuarios (compartido) y
 // una función para cerrar la conexión a la base de datos limpiamente.
 type Recursos struct {
-	Pesca        pescaStorage.AlmacenPesca
+	Pesca        AlmacenPesca
 	Pedidos      pedidosStorage.Almacen
-	Rutas        rutasStorage.AlmacenRutas
+	Rutas        AlmacenRutas
 	Usuarios     UserRepository
 	BackendUsado string
 	Cerrar       func() error
@@ -56,14 +54,17 @@ func Inicializar(driver, dsn, rutaDB, backend string) (*Recursos, error) {
 		return nil, fmt.Errorf("AutoMigrate: %w", err)
 	}
 
-	var almacenRutas rutasStorage.AlmacenRutas
+	var almacenRutas AlmacenRutas
+	var almacenPesca AlmacenPesca
 	backendUsado := "gorm"
 
 	if backend == "memoria" {
-		almacenRutas = rutasStorage.NuevaMemoriaRutas()
+		almacenRutas = NuevaMemoriaRutas()
+		almacenPesca = NuevaMemoriaPesca()
 		backendUsado = "memoria"
 	} else {
-		almacenRutas = rutasStorage.NuevoAlmacenSQLiteRutas(gdb)
+		almacenRutas = NuevoAlmacenSQLiteRutas(gdb)
+		almacenPesca = NuevoAlmacenSQLitePesca(gdb)
 	}
 
 	// Pedidos aún no tiene backend en memoria migrado; siempre usa GORM.
@@ -78,7 +79,7 @@ func Inicializar(driver, dsn, rutaDB, backend string) (*Recursos, error) {
 	}
 
 	return &Recursos{
-		Pesca:        pescaStorage.NuevoAlmacenPesca(gdb, backend),
+		Pesca:        almacenPesca,
 		Pedidos:      almacenPedidos,
 		Rutas:        almacenRutas,
 		Usuarios:     NewUsuarioGORM(gdb),
