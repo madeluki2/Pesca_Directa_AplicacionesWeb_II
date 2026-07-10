@@ -2,7 +2,7 @@
 # mínima solo lo copia. Resultado: imagen pequeña y sin el toolchain de Go.
 
 # ---- Etapa 1: builder ----
-FROM golang:1.24-alpine AS builder
+FROM golang:1.26-alpine AS builder
 WORKDIR /src
 
 # Cachear dependencias: copiar primero los módulos y descargar.
