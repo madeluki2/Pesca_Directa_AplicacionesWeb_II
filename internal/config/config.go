@@ -16,11 +16,13 @@ type Config struct {
 	Storage     string        // "gorm" o "memoria"
 	JWTSecreto  string        // Clave secreta para firmar tokens JWT
 	JWTDuracion time.Duration // Duración del token, ej: 24h
+	DBDriver    string        // Motor de base de datos: "sqlite" o "postgres"
+	DBDsn       string        // DSN de PostgreSQL (si DBDriver="postgres")
 }
 
 // Cargar inicializa y lee las variables de entorno del archivo .env
 func Cargar() (Config, error) {
-	// Intenta cargar el archivo .env, si no existe (como en producción con Docker) no pasa nada
+	// Intenta cargar el archivo .env, si no existe no pasa nada
 	_ = godotenv.Load()
 
 	duracion, err := parseDuracion(getEnv("JWT_DURACION", "24h"))
@@ -34,6 +36,8 @@ func Cargar() (Config, error) {
 		Storage:     getEnv("STORAGE", "gorm"),
 		JWTSecreto:  getEnv("JWT_SECRETO", "pesca-directa-tarqui-secret-2026"),
 		JWTDuracion: duracion,
+		DBDriver:    getEnv("DB_DRIVER", "sqlite"),
+		DBDsn:       getEnv("DB_DSN", ""),
 	}, nil
 }
 

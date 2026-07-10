@@ -12,7 +12,7 @@ import (
 // RespondJSON escribe data como JSON con el status HTTP indicado.
 // Centraliza el Content-Type y WriteHeader para que todos los handlers
 // devuelvan respuestas consistentes.
-func RespondJSON(w http.ResponseWriter, status int, data any) {
+func RespondJson(w http.ResponseWriter, status int, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if data == nil {
@@ -24,8 +24,8 @@ func RespondJSON(w http.ResponseWriter, status int, data any) {
 }
 
 // RespondError escribe un error en formato {"error": "..."}.
-func RespondError(w http.ResponseWriter, status int, mensaje string) {
-	RespondJSON(w, status, map[string]string{"error": mensaje})
+func RespondERROR(w http.ResponseWriter, status int, mensaje string) {
+	RespondJson(w, status, map[string]string{"error": mensaje})
 }
 
 // statusDeError convierte un error del dominio al código HTTP correspondiente.

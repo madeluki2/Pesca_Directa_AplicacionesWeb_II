@@ -13,13 +13,14 @@ import (
 	chimw "github.com/go-chi/chi/v5/middleware"
 
 	"Pesca_Directa_AplicacionesWeb_II/internal/config"
-	"Pesca_Directa_AplicacionesWeb_II/internal/handlers"
 	handlersPedidos "Pesca_Directa_AplicacionesWeb_II/internal/handlers/gestion_pedidos"
 	handlersPesca "Pesca_Directa_AplicacionesWeb_II/internal/handlers/gestion_pesca"
+	handlersRutas "Pesca_Directa_AplicacionesWeb_II/internal/handlers/rutas_de_distribucion"
 	"Pesca_Directa_AplicacionesWeb_II/internal/middleware"
 	"Pesca_Directa_AplicacionesWeb_II/internal/service"
 	servicePedidos "Pesca_Directa_AplicacionesWeb_II/internal/service/gestion_pedidos"
 	servicePesca "Pesca_Directa_AplicacionesWeb_II/internal/service/gestion_pesca"
+	serviceRutas "Pesca_Directa_AplicacionesWeb_II/internal/service/rutas_de_distribucion"
 	"Pesca_Directa_AplicacionesWeb_II/internal/storage"
 )
 
@@ -34,33 +35,30 @@ func main() {
 }
 
 func run(cfg config.Config) error {
-	// driver y dsn: SQLite por defecto, postgres si Storage=="postgres"
-	driver := "sqlite"
-	dsn := ""
-	if cfg.Storage == "postgres" {
-		driver = "postgres"
-		dsn = "host=db user=pesca password=pesca dbname=pesca_directa port=5432 sslmode=disable"
-	}
-
-	recursos, err := storage.Inicializar(driver, dsn, cfg.RutaDB, cfg.Storage)
+	// Inicializar almacenamiento
+	recursos, err := storage.Inicializar(cfg.DBDriver, cfg.DBDsn, cfg.RutaDB, cfg.Storage)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = recursos.Cerrar() }()
-	log.Printf("Motor: %s | Backend: %s", driver, recursos.BackendUsado)
+	log.Printf("Motor de base de datos: %s | Backend: %s", cfg.DBDriver, recursos.BackendUsado)
 
-	authService := service.NewAuthService(recursos.Usuarios)
-	pescaService := servicePesca.NewPescaService(recursos.Pesca)
-	pedidoService := servicePedidos.NewPedidoService(recursos.Pedidos)
-	rutasService := service.NewRutasService(recursos.Rutas)
+	// Servicios
+	authService := service.NewAuthService(
+		recursos.Usuarios,
+		service.WithSecreto(cfg.JWTSecreto),
+		service.WithDuracionToken(cfg.JWTDuracion),
+	)
+	pescaSvc := servicePesca.NewPescaService(recursos.Pesca)
+	pedidoSvc := servicePedidos.NewPedidoService(recursos.Pedidos)
+	rutasSvc := serviceRutas.NewRutasService(recursos.Rutas)
 
-	servidorComun := handlers.NewServer(handlers.Deps{
-		Rutas: rutasService,
-	})
+	// Handlers
+	hPesca := handlersPesca.NewServer(handlersPesca.Deps{Pesca: pescaSvc})
+	hPedidos := handlersPedidos.NewServer0(pedidoSvc, authService)
+	hRutas := handlersRutas.NewServer0(rutasSvc, authService)
 
-	hPesca := handlersPesca.NewServer(handlersPesca.Deps{Pesca: pescaService})
-	hPedidos := handlersPedidos.NewServer(pedidoService, authService)
-
+	// Router + middlewares
 	r := chi.NewRouter()
 	r.Use(chimw.Logger)
 	r.Use(chimw.Recoverer)
@@ -73,7 +71,7 @@ func run(cfg config.Config) error {
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.Auth(authService))
 
-			// ── Pesca (Anthony) ───────────────────────────────────────
+			// ── Pesca ──
 			r.Get("/pescadores", hPesca.ListarPescadores)
 			r.Post("/pescadores", hPesca.CrearPescador)
 			r.Get("/pescadores/{id}", hPesca.ObtenerPescador)
@@ -110,7 +108,7 @@ func run(cfg config.Config) error {
 			r.Put("/stocks/{id}", hPesca.ActualizarStock)
 			r.Delete("/stocks/{id}", hPesca.BorrarStock)
 
-			// ── Pedidos (Ilaria) ──────────────────────────────────────
+			// ── Pedidos ──
 			r.Get("/clientes", hPedidos.ListarClientes)
 			r.Post("/clientes", hPedidos.CrearCliente)
 			r.Get("/clientes/{id}", hPedidos.ObtenerCliente)
@@ -130,30 +128,30 @@ func run(cfg config.Config) error {
 			r.Put("/detalles-pedido/{id}", hPedidos.ActualizarDetalle)
 			r.Delete("/detalles-pedido/{id}", hPedidos.EliminarDetalle)
 
-			// ── Rutas (Madelyn) ───────────────────────────────────────
-			r.Get("/rutas", servidorComun.ListarRutas)
-			r.Post("/rutas", servidorComun.CrearRuta)
-			r.Get("/rutas/{id}", servidorComun.ObtenerRuta)
-			r.Put("/rutas/{id}", servidorComun.ActualizarRuta)
-			r.Delete("/rutas/{id}", servidorComun.BorrarRuta)
+			// ── Rutas ──
+			r.Get("/rutas", hRutas.ListarRutas)
+			r.Post("/rutas", hRutas.CrearRuta)
+			r.Get("/rutas/{id}", hRutas.ObtenerRuta)
+			r.Put("/rutas/{id}", hRutas.ActualizarRuta)
+			r.Delete("/rutas/{id}", hRutas.BorrarRuta)
 
-			r.Get("/puntos", servidorComun.ListarPuntos)
-			r.Post("/puntos", servidorComun.CrearPunto)
-			r.Get("/puntos/{id}", servidorComun.ObtenerPunto)
-			r.Put("/puntos/{id}", servidorComun.ActualizarPunto)
-			r.Delete("/puntos/{id}", servidorComun.BorrarPunto)
+			r.Get("/puntos", hRutas.ListarPuntos)
+			r.Post("/puntos", hRutas.CrearPunto)
+			r.Get("/puntos/{id}", hRutas.ObtenerPunto)
+			r.Put("/puntos/{id}", hRutas.ActualizarPunto)
+			r.Delete("/puntos/{id}", hRutas.BorrarPunto)
 
-			r.Get("/transportistas", servidorComun.ListarTransportistas)
-			r.Post("/transportistas", servidorComun.CrearTransportista)
-			r.Get("/transportistas/{id}", servidorComun.ObtenerTransportista)
-			r.Put("/transportistas/{id}", servidorComun.ActualizarTransportista)
-			r.Delete("/transportistas/{id}", servidorComun.BorrarTransportista)
+			r.Get("/transportistas", hRutas.ListarTransportistas)
+			r.Post("/transportistas", hRutas.CrearTransportista)
+			r.Get("/transportistas/{id}", hRutas.ObtenerTransportista)
+			r.Put("/transportistas/{id}", hRutas.ActualizarTransportista)
+			r.Delete("/transportistas/{id}", hRutas.BorrarTransportista)
 
-			r.Get("/entregas", servidorComun.ListarEntregas)
-			r.Post("/entregas", servidorComun.CrearEntrega)
-			r.Get("/entregas/{id}", servidorComun.ObtenerEntrega)
-			r.Put("/entregas/{id}", servidorComun.ActualizarEntrega)
-			r.Delete("/entregas/{id}", servidorComun.BorrarEntrega)
+			r.Get("/entregas", hRutas.ListarEntregas)
+			r.Post("/entregas", hRutas.CrearEntrega)
+			r.Get("/entregas/{id}", hRutas.ObtenerEntrega)
+			r.Put("/entregas/{id}", hRutas.ActualizarEntrega)
+			r.Delete("/entregas/{id}", hRutas.BorrarEntrega)
 		})
 	})
 

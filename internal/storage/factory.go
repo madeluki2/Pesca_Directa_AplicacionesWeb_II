@@ -12,13 +12,14 @@ import (
 	"Pesca_Directa_AplicacionesWeb_II/internal/models"
 	pedidosStorage "Pesca_Directa_AplicacionesWeb_II/internal/storage/gestion_pedidos"
 	pescaStorage "Pesca_Directa_AplicacionesWeb_II/internal/storage/gestion_pesca"
+	rutasStorage "Pesca_Directa_AplicacionesWeb_II/internal/storage/rutas_de_distribucion"
 )
 
-// Recursos agrupa los almacenes de los modulos y el repositorio compartido de usuarios.
+// Recursos agrupa los almacenes de los módulos y el repositorio compartido de usuarios.
 type Recursos struct {
 	Pesca        pescaStorage.AlmacenPesca
 	Pedidos      pedidosStorage.Almacen
-	Rutas        AlmacenRutas
+	Rutas        rutasStorage.AlmacenRutas
 	Usuarios     UserRepository
 	BackendUsado string
 	Cerrar       func() error
@@ -50,11 +51,20 @@ func Inicializar(driver, dsn, rutaDB, backend string) (*Recursos, error) {
 		return nil, fmt.Errorf("AutoMigrate: %w", err)
 	}
 
+	var almacenRutas rutasStorage.AlmacenRutas
+	var almacenPesca pescaStorage.AlmacenPesca
+	var almacenPedidos pedidosStorage.Almacen
 	backendUsado := "gorm"
-	almacenRutas := AlmacenRutas(NuevoAlmacenSQLiteRutas(gdb))
+
 	if backend == "memoria" {
-		almacenRutas = NuevaMemoriaRutas()
+		almacenRutas = rutasStorage.NuevaMemoriaRutas()
+		almacenPesca = pescaStorage.NuevaMemoriaPesca()
+		almacenPedidos = pedidosStorage.NuevoAlmacenSQLite(gdb)
 		backendUsado = "memoria"
+	} else {
+		almacenRutas = rutasStorage.NuevoAlmacenSQLiteRutas(gdb)
+		almacenPesca = pescaStorage.NuevoAlmacenPesca(gdb, backend)
+		almacenPedidos = pedidosStorage.NuevoAlmacenSQLite(gdb)
 	}
 
 	cerrar := func() error {
@@ -66,8 +76,8 @@ func Inicializar(driver, dsn, rutaDB, backend string) (*Recursos, error) {
 	}
 
 	return &Recursos{
-		Pesca:        pescaStorage.NuevoAlmacenPesca(gdb, backend),
-		Pedidos:      pedidosStorage.NuevoAlmacenSQLite(gdb),
+		Pesca:        almacenPesca,
+		Pedidos:      almacenPedidos,
 		Rutas:        almacenRutas,
 		Usuarios:     NewUsuarioGORM(gdb),
 		BackendUsado: backendUsado,
@@ -85,7 +95,7 @@ func abrirGorm(driver, dsn, rutaDB string) (*gorm.DB, error) {
 			if err == nil {
 				return gdb, nil
 			}
-			log.Printf("PostgreSQL no esta listo (intento %d/10): %v", intento, err)
+			log.Printf("PostgreSQL no está listo (intento %d/10): %v", intento, err)
 			time.Sleep(2 * time.Second)
 		}
 		return nil, fmt.Errorf("conectar a PostgreSQL tras reintentos: %w", err)

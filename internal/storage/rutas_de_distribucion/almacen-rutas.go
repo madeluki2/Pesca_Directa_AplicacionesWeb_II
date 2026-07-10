@@ -1,4 +1,4 @@
-package storage
+package rutas_de_distribucion
 
 import (
 	"Pesca_Directa_AplicacionesWeb_II/internal/models"

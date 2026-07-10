@@ -78,7 +78,7 @@ func construirEntornoPedido(t *testing.T) (http.Handler, string) {
 	pedidoSvc := svcgp.NewPedidoService(almacen)
 	authSvc := service.NewAuthService(usuarios)
 
-	srv := &gp.Server{
+	srv := &gp.Server0{
 		Pedidos: pedidoSvc,
 		Auth:    authSvc,
 	}

@@ -67,17 +67,6 @@ func statusDeError(err error) int {
 		errors.Is(err, service.ErrPrecioInvalido):
 		return http.StatusBadRequest
 
-	// Madelyn — Rutas de Distribución
-	case errors.Is(err, service.ErrOrigenVacio),
-		errors.Is(err, service.ErrDestinoVacio),
-		errors.Is(err, service.ErrRutaIDVacio),
-		errors.Is(err, service.ErrPlacaVacia),
-		errors.Is(err, service.ErrPlacaDuplicada),
-		errors.Is(err, service.ErrPedidoIDVacio),
-		errors.Is(err, service.ErrPuntoIDVacio),
-		errors.Is(err, service.ErrTransportistaIDVacio):
-		return http.StatusBadRequest
-
 	// ── 401 Unauthorized ─────────────────────────────────────────────────
 	// (solo Ilaria lo definió explícito, pero aplica a todos)
 	case errors.Is(err, service.ErrCredencialesInvalidas):
@@ -101,13 +90,6 @@ func statusDeError(err error) int {
 	case errors.Is(err, service.ErrClienteNoEncontrado),
 		errors.Is(err, service.ErrPedidoNoEncontrado),
 		errors.Is(err, service.ErrDetalleNoEncontrado):
-		return http.StatusNotFound
-
-	// Madelyn — Rutas de Distribución
-	case errors.Is(err, service.ErrRutaNoEncontrada),
-		errors.Is(err, service.ErrPuntoNoEncontrado),
-		errors.Is(err, service.ErrTransportistaNoEncontrado),
-		errors.Is(err, service.ErrEntregaNoEncontrada):
 		return http.StatusNotFound
 
 	// ── 500 Internal Server Error ─────────────────────────────────────────
