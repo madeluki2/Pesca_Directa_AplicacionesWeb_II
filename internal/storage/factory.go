@@ -10,18 +10,27 @@ import (
 	"gorm.io/gorm"
 
 	"Pesca_Directa_AplicacionesWeb_II/internal/models"
+	pedidosStorage "Pesca_Directa_AplicacionesWeb_II/internal/storage/gestion_pedidos"
 	pescaStorage "Pesca_Directa_AplicacionesWeb_II/internal/storage/gestion_pesca"
+	rutasStorage "Pesca_Directa_AplicacionesWeb_II/internal/storage/rutas_de_distribucion"
 )
 
+// Recursos agrupa todo lo que main.go necesita para arrancar: los tres
+// almacenes (uno por módulo), el repositorio de usuarios (compartido) y
+// una función para cerrar la conexión a la base de datos limpiamente.
 type Recursos struct {
 	Pesca        pescaStorage.AlmacenPesca
-	Pedidos      Almacen
-	Rutas        AlmacenRutas
+	Pedidos      pedidosStorage.Almacen
+	Rutas        rutasStorage.AlmacenRutas
 	Usuarios     UserRepository
 	BackendUsado string
 	Cerrar       func() error
 }
 
+// Inicializar abre la base de datos (sqlite en local, postgres en Docker),
+// corre AutoMigrate para TODOS los modelos de los 3 módulos, y arma los
+// almacenes correspondientes usando una única conexión *gorm.DB inyectada
+// en cada uno (Pesca, Pedidos y Rutas).
 func Inicializar(driver, dsn, rutaDB, backend string) (*Recursos, error) {
 	gdb, err := abrirGorm(driver, dsn, rutaDB)
 	if err != nil {
@@ -47,20 +56,18 @@ func Inicializar(driver, dsn, rutaDB, backend string) (*Recursos, error) {
 		return nil, fmt.Errorf("AutoMigrate: %w", err)
 	}
 
-	var almacenPedidos Almacen
-	var almacenRutas AlmacenRutas
+	var almacenRutas rutasStorage.AlmacenRutas
 	backendUsado := "gorm"
 
 	if backend == "memoria" {
-		m := NewMemoria()
-		m.Seed()
-		almacenPedidos = m
-		almacenRutas = NuevaMemoriaRutas()
+		almacenRutas = rutasStorage.NuevaMemoriaRutas()
 		backendUsado = "memoria"
 	} else {
-		almacenPedidos = NuevoAlmacenSQLite(gdb)
-		almacenRutas = NuevoAlmacenSQLiteRutas(gdb)
+		almacenRutas = rutasStorage.NuevoAlmacenSQLiteRutas(gdb)
 	}
+
+	// Pedidos aún no tiene backend en memoria migrado; siempre usa GORM.
+	almacenPedidos := pedidosStorage.NuevoAlmacenSQLite(gdb)
 
 	cerrar := func() error {
 		sqlDB, err := gdb.DB()
