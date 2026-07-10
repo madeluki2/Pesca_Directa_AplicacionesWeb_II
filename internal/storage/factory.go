@@ -10,24 +10,28 @@ import (
 	"gorm.io/gorm"
 
 	"Pesca_Directa_AplicacionesWeb_II/internal/models"
-	. "Pesca_Directa_AplicacionesWeb_II/internal/storage/rutas_de_distribucion"
+	pedidosStorage "Pesca_Directa_AplicacionesWeb_II/internal/storage/gestion_pedidos"
+	pescaStorage "Pesca_Directa_AplicacionesWeb_II/internal/storage/gestion_pesca"
+	rutasStorage "Pesca_Directa_AplicacionesWeb_II/internal/storage/rutas_de_distribucion"
 )
 
-// Recursos agrupa todo lo que la capa de almacenamiento expone a la aplicación.
-// Los campos son INTERFACES (no tipos concretos) para que tanto MemoriaPesca
-// como AlmacenSQLitePesca puedan asignarse sin error de tipo.
+// Recursos agrupa todo lo que main.go necesita para arrancar: los tres
+// almacenes (uno por módulo), el repositorio de usuarios (compartido) y
+// una función para cerrar la conexión a la base de datos limpiamente.
 type Recursos struct {
-	Pesca        AlmacenPesca   // interfaz — acepta MemoriaPesca o AlmacenSQLitePesca
-	Pedidos      Almacen        // interfaz — acepta Memoria o AlmacenSQLite
-	Rutas        AlmacenRutas   // interfaz — acepta MemoriaRutas o AlmacenSQLiteRutas
-	Usuarios     UserRepository // siempre GORM
+	Pesca        pescaStorage.AlmacenPesca
+	Pedidos      pedidosStorage.Almacen
+	Rutas        rutasStorage.AlmacenRutas
+	Usuarios     UserRepository
 	BackendUsado string
 	Cerrar       func() error
 }
 
-// Inicializar centraliza TODO el plumbing de almacenamiento (patrón Factory).
+// Inicializar abre la base de datos (sqlite en local, postgres en Docker),
+// corre AutoMigrate para TODOS los modelos de los 3 módulos, y arma los
+// almacenes correspondientes usando una única conexión *gorm.DB inyectada
+// en cada uno (Pesca, Pedidos y Rutas).
 func Inicializar(driver, dsn, rutaDB, backend string) (*Recursos, error) {
-	// 1. GORM abre la BD, migra el esquema y siembra datos iniciales.
 	gdb, err := abrirGorm(driver, dsn, rutaDB)
 	if err != nil {
 		return nil, err
@@ -52,30 +56,19 @@ func Inicializar(driver, dsn, rutaDB, backend string) (*Recursos, error) {
 		return nil, fmt.Errorf("AutoMigrate: %w", err)
 	}
 
-	// 2. Elegir backend según variable STORAGE.
-	// Las variables son de tipo interfaz → cualquier implementación es válida.
-	var almacenPesca AlmacenPesca
-	var almacenPedidos Almacen
-	var almacenRutas AlmacenRutas
+	var almacenRutas rutasStorage.AlmacenRutas
 	backendUsado := "gorm"
 
 	if backend == "memoria" {
-		almacenPesca = NuevaMemoriaPesca() // *MemoriaPesca implementa AlmacenPesca ✓
-		m := NewMemoria()
-		m.Seed()
-		almacenPedidos = m                 // *Memoria implementa Almacen ✓
-		almacenRutas = NuevaMemoriaRutas() // *MemoriaRutas implementa AlmacenRutas ✓
+		almacenRutas = rutasStorage.NuevaMemoriaRutas()
 		backendUsado = "memoria"
 	} else {
-		almacenPesca = NuevoAlmacenSQLitePesca(gdb)
-		almacenPedidos = NuevoAlmacenSQLite(gdb)
-		almacenRutas = NuevoAlmacenSQLiteRutas(gdb)
+		almacenRutas = rutasStorage.NuevoAlmacenSQLiteRutas(gdb)
 	}
 
-	// 3. Usuarios siempre en GORM.
-	usuarios := NewUsuarioGORM(gdb)
+	// Pedidos aún no tiene backend en memoria migrado; siempre usa GORM.
+	almacenPedidos := pedidosStorage.NuevoAlmacenSQLite(gdb)
 
-	// 4. Cierre ordenado.
 	cerrar := func() error {
 		sqlDB, err := gdb.DB()
 		if err != nil {
@@ -85,17 +78,15 @@ func Inicializar(driver, dsn, rutaDB, backend string) (*Recursos, error) {
 	}
 
 	return &Recursos{
-		Pesca:        almacenPesca,
+		Pesca:        pescaStorage.NuevoAlmacenPesca(gdb, backend),
 		Pedidos:      almacenPedidos,
 		Rutas:        almacenRutas,
-		Usuarios:     usuarios,
+		Usuarios:     NewUsuarioGORM(gdb),
 		BackendUsado: backendUsado,
 		Cerrar:       cerrar,
 	}, nil
 }
 
-// abrirGorm elige el Dialector según el driver y abre la conexión.
-// Para PostgreSQL reintenta 10 veces con 2s de espera entre intentos.
 func abrirGorm(driver, dsn, rutaDB string) (*gorm.DB, error) {
 	switch driver {
 	case "postgres":
@@ -106,11 +97,11 @@ func abrirGorm(driver, dsn, rutaDB string) (*gorm.DB, error) {
 			if err == nil {
 				return gdb, nil
 			}
-			log.Printf("PostgreSQL no está listo (intento %d/10): %v", intento, err)
+			log.Printf("PostgreSQL no esta listo (intento %d/10): %v", intento, err)
 			time.Sleep(2 * time.Second)
 		}
 		return nil, fmt.Errorf("conectar a PostgreSQL tras reintentos: %w", err)
-	default: // "sqlite"
+	default:
 		gdb, err := gorm.Open(sqlite.Open(rutaDB), &gorm.Config{})
 		if err != nil {
 			return nil, fmt.Errorf("abrir SQLite: %w", err)
